@@ -296,6 +296,79 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
+  .meals-list {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+  .meal-slot {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 6px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--bg-main);
+    min-height: 84px;
+    text-align: center;
+  }
+  .meal-slot.empty { justify-content: center; border-style: dashed; opacity: 0.75; }
+  .meal-slot-label { font-size: 11px; color: var(--text-muted); font-weight: 600; }
+  .meal-add-btn {
+    border: none;
+    background: transparent;
+    color: var(--accent);
+    cursor: pointer;
+    font-size: 12px;
+    padding: 4px;
+  }
+  .meal-thumb {
+    width: 100%;
+    max-width: 84px;
+    height: 52px;
+    object-fit: cover;
+    border-radius: 7px;
+    border: 1px solid var(--border);
+  }
+  .meal-text {
+    font-size: 11px;
+    color: var(--text-main);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
+  .meal-calorie-badge {
+    font-size: 10px;
+    color: var(--accent);
+    background: var(--accent-soft, rgba(124,108,240,0.15));
+    border-radius: 999px;
+    padding: 1px 7px;
+  }
+  .meal-actions { display: flex; gap: 4px; }
+  .meal-edit-btn, .meal-delete-btn {
+    border: none;
+    background: transparent;
+    cursor: pointer;
+    font-size: 12px;
+    opacity: 0.75;
+    padding: 2px 5px;
+  }
+  .meal-text-input {
+    width: 100%;
+    padding: 4px 6px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-main);
+    font-size: 11.5px;
+  }
+  .meal-file-input { width: 100%; font-size: 10px; color: var(--text-muted); }
   .cal-unschedule-btn {
     margin-left: auto;
     background: transparent;
@@ -802,6 +875,11 @@
         <ul id="home-todo-list" class="plain-list"></ul>
       </section>
 
+      <section class="card">
+        <h2>🍚 ごはん</h2>
+        <ul id="meals-list" class="meals-list"></ul>
+      </section>
+
       <section id="briefing-card" class="card" hidden>
         <h2>🤖 AIからのお知らせ</h2>
         <div id="briefing-body" class="note-preview"></div>
@@ -907,6 +985,14 @@ const TODOS_FILE = '.todos.json';
 const CATEGORIES_FILE = '.categories.json';
 const LINKS_FILE = '.note-links.json';
 const BRIEFING_PATH = '_ai/BRIEFING.md';
+// 改善.md追加項目「ごはん管理機能」: 朝・昼・晩の記録（画像＋テキスト）。カロリー概算は毎晩22:00のCoworkスケジュールタスクが書き込む
+const MEALS_FILE = '.meals.json';
+const IMAGES_DIR_NAME = 'images';
+const MEAL_SLOTS = [
+  { key: 'breakfast', label: '朝' },
+  { key: 'lunch', label: '昼' },
+  { key: 'dinner', label: '晩' },
+];
 
 let config = null;
 let categories = [];
@@ -914,6 +1000,8 @@ let todos = [];
 let todosSha = null;
 let noteLinks = []; // [{ note: path, todoId }] メモ⇔やりたいことの紐づけ（PC版と共有）
 let noteLinksSha = null;
+let meals = [];
+let mealsSha = null;
 let notes = [];
 let treeByPath = new Map();
 let linkActiveTab = 'todo';
@@ -953,6 +1041,7 @@ const briefingCard = document.getElementById('briefing-card');
 const briefingBodyEl = document.getElementById('briefing-body');
 const pinnedListEl = document.getElementById('pinned-list');
 const allNotesListEl = document.getElementById('all-notes-list');
+const mealsListEl = document.getElementById('meals-list');
 
 const noteBackBtn = document.getElementById('note-back-btn');
 const noteTitleLabelEl = document.getElementById('note-title-label');
@@ -1180,6 +1269,21 @@ async function loadAll() {
       }
       const viaContentsLinks = await fetchFileViaContents(LINKS_FILE);
       noteLinksSha = viaContentsLinks ? viaContentsLinks.sha : entry.sha;
+    }
+
+    meals = [];
+    mealsSha = null;
+    if (treeByPath.has(MEALS_FILE)) {
+      const entry = treeByPath.get(MEALS_FILE);
+      const bytes = await fetchBlob(entry.sha);
+      try {
+        meals = JSON.parse(bytesToUtf8(bytes));
+        if (!Array.isArray(meals)) meals = [];
+      } catch (e) {
+        meals = [];
+      }
+      const viaContentsMeals = await fetchFileViaContents(MEALS_FILE);
+      mealsSha = viaContentsMeals ? viaContentsMeals.sha : entry.sha;
     }
 
     let briefingText = null;
@@ -1449,6 +1553,7 @@ calNextBtn.addEventListener('click', () => {
 
 function renderHome() {
   todayLabelEl.textContent = formatToday(new Date());
+  renderMeals();
 
   homeTodoListEl.innerHTML = '';
   if (todos.length === 0) {
@@ -1785,6 +1890,289 @@ async function writeTodos() {
     console.error(e);
     setStatus(`保存に失敗しました。オフラインまたはトークンが失効している可能性があります。（${e.message || e}）`, true);
   }
+}
+
+// ---- ごはん管理（.meals.json。改善.md追加項目。スマホ版で初めて画像入力に対応） ----
+// カロリー概算（calorieEstimate/aiComment）はここでは計算しない。毎晩22:00のCoworkスケジュールタスクが
+// AIで画像を見て推定し、.meals.jsonへ書き戻す。
+
+function findMealEntry(dateStr, slotKey) {
+  return meals.find((m) => m.date === dateStr && m.slot === slotKey);
+}
+
+// アップロード直後はtreeByPathがまだ古い（次回のloadAllまで反映されない）ため、
+// 直近でアップロードした画像だけはこのセッション内のBlob URLを優先して表示する
+const localMealImageUrls = new Map();
+
+function mergeMeals(localList, remoteList) {
+  const localById = new Map(localList.map((m) => [m.id, m]));
+  const remoteById = new Map(remoteList.map((m) => [m.id, m]));
+  const mergedById = new Map();
+  localById.forEach((local, id) => {
+    const remote = remoteById.get(id);
+    if (!remote) { mergedById.set(id, local); return; }
+    const lu = local.updated || '';
+    const ru = remote.updated || '';
+    mergedById.set(id, ru > lu ? remote : local);
+  });
+  remoteById.forEach((remote, id) => {
+    if (!mergedById.has(id)) mergedById.set(id, remote);
+  });
+  return [...mergedById.values()];
+}
+
+// .meals.json への書き込み。sha不一致（409/422）の場合はリモートを取得してマージし、1回だけ再試行する
+async function writeMeals() {
+  setStatus('保存中...');
+  try {
+    const body = {
+      message: 'mobile: update .meals.json',
+      content: bytesToBase64(utf8ToBytes(JSON.stringify(meals, null, 2))),
+      branch: config.branch,
+    };
+    if (mealsSha) body.sha = mealsSha;
+
+    let res = await ghFetch(`/contents/${encodeApiPath(MEALS_FILE)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+
+    if ((res.status === 409 || res.status === 422) && mealsSha) {
+      const latest = await fetchFileViaContents(MEALS_FILE);
+      if (latest) {
+        let remoteMeals = [];
+        try {
+          remoteMeals = JSON.parse(bytesToUtf8(latest.bytes));
+        } catch (e) {
+          remoteMeals = [];
+        }
+        meals = mergeMeals(meals, remoteMeals);
+        renderHome();
+        const retryBody = {
+          ...body,
+          sha: latest.sha,
+          content: bytesToBase64(utf8ToBytes(JSON.stringify(meals, null, 2))),
+        };
+        res = await ghFetch(`/contents/${encodeApiPath(MEALS_FILE)}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(retryBody),
+        });
+      }
+    }
+
+    if (!res.ok) {
+      const errText = await res.text().catch(() => '');
+      throw new Error(`保存に失敗しました（${res.status}）${errText ? `: ${errText}` : ''}`);
+    }
+    const data = await res.json();
+    mealsSha = data.content.sha;
+    setStatus(null);
+  } catch (e) {
+    console.error(e);
+    setStatus(`保存に失敗しました。オフラインまたはトークンが失効している可能性があります。（${e.message || e}）`, true);
+  }
+}
+
+// 写真をimages/へ直接アップロード（Contents API、新規ファイルなのでshaは不要）。1MB超の画像は失敗する可能性がある
+async function uploadMealImage(file) {
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  const extGuess = (file.type.split('/')[1] || 'jpg').replace('jpeg', 'jpg');
+  const name = `meal-${Date.now()}.${extGuess}`;
+  const path = `${IMAGES_DIR_NAME}/${name}`;
+  const res = await ghFetch(`/contents/${encodeApiPath(path)}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      message: `mobile: add ${path}`,
+      content: bytesToBase64(bytes),
+      branch: config.branch,
+    }),
+  });
+  if (!res.ok) {
+    const errText = await res.text().catch(() => '');
+    throw new Error(`画像のアップロードに失敗しました（${res.status}）${errText ? `: ${errText}` : ''}`);
+  }
+  return path;
+}
+
+function buildMealSlot(dateStr, slotKey, label) {
+  let entry = findMealEntry(dateStr, slotKey);
+  const li = document.createElement('li');
+
+  function renderView() {
+    li.innerHTML = '';
+    li.className = `meal-slot${entry ? ' filled' : ' empty'}`;
+    const labelEl = document.createElement('span');
+    labelEl.className = 'meal-slot-label';
+    labelEl.textContent = label;
+    li.appendChild(labelEl);
+
+    if (!entry) {
+      const addBtn = document.createElement('button');
+      addBtn.type = 'button';
+      addBtn.className = 'meal-add-btn';
+      addBtn.textContent = '＋ 記録する';
+      addBtn.addEventListener('click', renderEdit);
+      li.appendChild(addBtn);
+      return;
+    }
+
+    if (entry.image) {
+      const img = document.createElement('img');
+      img.className = 'meal-thumb';
+      img.alt = label;
+      if (localMealImageUrls.has(entry.image)) {
+        img.src = localMealImageUrls.get(entry.image);
+      } else {
+        const treeEntry = treeByPath.get(entry.image);
+        if (treeEntry) {
+          fetchBlob(treeEntry.sha).then((bytes) => {
+            const blob = new Blob([bytes], { type: 'image/jpeg' });
+            img.src = URL.createObjectURL(blob);
+          }).catch(() => {});
+        }
+      }
+      li.appendChild(img);
+    }
+    if (entry.text) {
+      const textEl = document.createElement('div');
+      textEl.className = 'meal-text';
+      textEl.textContent = entry.text;
+      li.appendChild(textEl);
+    }
+    if (typeof entry.calorieEstimate === 'number') {
+      const cal = document.createElement('span');
+      cal.className = 'meal-calorie-badge';
+      cal.textContent = `約${entry.calorieEstimate}kcal`;
+      li.appendChild(cal);
+    }
+    const actions = document.createElement('div');
+    actions.className = 'meal-actions';
+    const editBtn = document.createElement('button');
+    editBtn.type = 'button';
+    editBtn.className = 'meal-edit-btn';
+    editBtn.textContent = '✏️';
+    editBtn.addEventListener('click', renderEdit);
+    const delBtn = document.createElement('button');
+    delBtn.type = 'button';
+    delBtn.className = 'meal-delete-btn';
+    delBtn.textContent = '🗑';
+    delBtn.addEventListener('click', async () => {
+      if (!confirm(`「${label}」の記録を削除しますか？`)) return;
+      meals = meals.filter((m) => m.id !== entry.id);
+      entry = null;
+      renderView();
+      await writeMeals();
+    });
+    actions.appendChild(editBtn);
+    actions.appendChild(delBtn);
+    li.appendChild(actions);
+  }
+
+  function renderEdit() {
+    li.innerHTML = '';
+    li.className = 'meal-slot editing';
+    const labelEl = document.createElement('span');
+    labelEl.className = 'meal-slot-label';
+    labelEl.textContent = label;
+    li.appendChild(labelEl);
+
+    const textInput = document.createElement('input');
+    textInput.type = 'text';
+    textInput.className = 'meal-text-input';
+    textInput.placeholder = '食べたもの（任意）';
+    textInput.value = entry ? entry.text || '' : '';
+    li.appendChild(textInput);
+
+    let pendingFile = null;
+    const preview = document.createElement('img');
+    preview.className = 'meal-thumb';
+    preview.hidden = true;
+    li.appendChild(preview);
+
+    const fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.accept = 'image/*';
+    fileInput.capture = 'environment';
+    fileInput.className = 'meal-file-input';
+    fileInput.addEventListener('change', () => {
+      const file = fileInput.files && fileInput.files[0];
+      if (!file) return;
+      pendingFile = file;
+      preview.src = URL.createObjectURL(file);
+      preview.hidden = false;
+    });
+    li.appendChild(fileInput);
+
+    const actions = document.createElement('div');
+    actions.className = 'meal-actions';
+    const saveBtn = document.createElement('button');
+    saveBtn.type = 'button';
+    saveBtn.textContent = '保存';
+    const cancelBtn = document.createElement('button');
+    cancelBtn.type = 'button';
+    cancelBtn.textContent = 'キャンセル';
+    actions.appendChild(cancelBtn);
+    actions.appendChild(saveBtn);
+    li.appendChild(actions);
+
+    cancelBtn.addEventListener('click', renderView);
+    saveBtn.addEventListener('click', async () => {
+      const textVal = textInput.value.trim();
+      saveBtn.disabled = true;
+      saveBtn.textContent = '保存中...';
+      let imagePath = entry ? entry.image : null;
+      try {
+        if (pendingFile) {
+          imagePath = await uploadMealImage(pendingFile);
+          localMealImageUrls.set(imagePath, URL.createObjectURL(pendingFile));
+        }
+      } catch (e) {
+        alert(e.message || '画像のアップロードに失敗しました');
+        saveBtn.disabled = false;
+        saveBtn.textContent = '保存';
+        return;
+      }
+      if (!textVal && !imagePath) {
+        renderView();
+        return;
+      }
+      const now = new Date().toISOString();
+      if (entry) {
+        entry.text = textVal;
+        entry.image = imagePath;
+        entry.updated = now;
+      } else {
+        entry = {
+          id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+          date: dateStr,
+          slot: slotKey,
+          text: textVal,
+          image: imagePath,
+          calorieEstimate: null,
+          aiComment: null,
+          updated: now,
+        };
+        meals.push(entry);
+      }
+      renderView();
+      await writeMeals();
+    });
+  }
+
+  renderView();
+  return li;
+}
+
+function renderMeals() {
+  if (!mealsListEl) return;
+  const todayStr = dateKey(new Date());
+  mealsListEl.innerHTML = '';
+  MEAL_SLOTS.forEach(({ key, label }) => {
+    mealsListEl.appendChild(buildMealSlot(todayStr, key, label));
+  });
 }
 
 // ---- メモ⇔やりたいことの紐づけ（.note-links.json。PC版と共有するデータ形式） ----
