@@ -47,6 +47,19 @@
     --shadow-sm: 0 1px 2px rgba(21, 21, 43, 0.06);
     --shadow-md: 0 2px 4px rgba(21, 21, 43, 0.04), 0 10px 28px rgba(21, 21, 43, 0.07);
   }
+  html[data-theme="cream"] {
+    --bg-main: #faf3e3;
+    --bg-panel: #fffdf6;
+    --text-main: #2f2a22;
+    --text-muted: #7a6f5a;
+    --border: #e6dac0;
+    --accent: #6c63ff;
+    --accent-hover: #5a51e6;
+    --accent-2: #8f6af9;
+    --danger: #d1383d;
+    --shadow-sm: 0 1px 2px rgba(47, 42, 34, 0.08);
+    --shadow-md: 0 2px 4px rgba(47, 42, 34, 0.05), 0 10px 28px rgba(47, 42, 34, 0.09);
+  }
   html, body { transition: background 0.15s ease, color 0.15s ease; }
   * { box-sizing: border-box; }
   html, body {
@@ -1881,16 +1894,21 @@ refreshBtn.addEventListener('click', () => loadAll());
 // ---- ライト/ダーク表示切替 ----
 
 const THEME_KEY = 'memo-mobile-theme';
+const THEME_ORDER = ['dark', 'light', 'cream'];
+const THEME_ICONS = { dark: '🌙', light: '☀️', cream: '🍯' };
+const THEME_NEXT_TITLE = { dark: 'ライト表示に切替', light: 'クリーム表示に切替', cream: 'ダーク表示に切替' };
 
 function applyTheme(theme) {
-  document.documentElement.setAttribute('data-theme', theme);
-  themeToggleBtn.textContent = theme === 'light' ? '☀️' : '🌙';
-  themeToggleBtn.title = theme === 'light' ? 'ダーク表示に切替' : 'ライト表示に切替';
+  const value = THEME_ORDER.includes(theme) ? theme : 'dark';
+  document.documentElement.setAttribute('data-theme', value);
+  themeToggleBtn.textContent = THEME_ICONS[value];
+  themeToggleBtn.title = THEME_NEXT_TITLE[value];
 }
 
 themeToggleBtn.addEventListener('click', () => {
-  const current = document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
-  const next = current === 'light' ? 'dark' : 'light';
+  const current = document.documentElement.getAttribute('data-theme');
+  const idx = THEME_ORDER.includes(current) ? THEME_ORDER.indexOf(current) : 0;
+  const next = THEME_ORDER[(idx + 1) % THEME_ORDER.length];
   localStorage.setItem(THEME_KEY, next);
   applyTheme(next);
 });
