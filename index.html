@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
-<title>memo (mobile)</title>
+<title>MEMOTAS</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -265,6 +265,7 @@
   }
   li.todo-item {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: 8px;
     font-size: 14px;
@@ -277,6 +278,24 @@
     flex-shrink: 0;
   }
   .priority { color: var(--danger); flex-shrink: 0; }
+  .todo-author-badge {
+    flex-shrink: 0;
+    font-size: 10px;
+    color: var(--text-muted);
+    background: var(--bg-main);
+    border: 1px solid var(--border);
+    padding: 1px 7px;
+    border-radius: 999px;
+  }
+  .todo-note-line {
+    flex-basis: 100%;
+    padding-left: 26px;
+    font-size: 11.5px;
+    color: var(--text-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
   .cal-unschedule-btn {
     margin-left: auto;
     background: transparent;
@@ -724,7 +743,7 @@
 
   <div id="setup-screen" class="setup-screen">
     <div class="setup-box">
-      <h1>memo (mobile)</h1>
+      <h1>MEMOTAS</h1>
       <p class="hint">
         PC版で設定したGitHubのプライベートリポジトリに接続します。owner/repo・branch・トークンはPC版の「☁️ GitHub同期」設定と同じ値を入力してください。
         トークンはこの端末のブラウザにのみ保存されます。
@@ -750,7 +769,7 @@
 
   <div id="app" class="app" hidden>
     <header class="top-bar">
-      <h1 id="header-title">memo</h1>
+      <h1 id="header-title">MEMOTAS</h1>
       <div class="top-bar-actions">
         <button id="theme-toggle-btn" class="icon-btn" title="表示切替">🌙</button>
         <button id="refresh-btn" class="icon-btn" title="再読み込み">🔄</button>
@@ -1494,7 +1513,10 @@ function buildHomeTodoRow(todo) {
   const priorityHtml = todo.priority === 'high' ? '<span class="priority">❗</span>' : '';
   const linkCount = linkedNotePathsForTodo(todo.id).length;
   const badgeHtml = linkCount ? `<span class="link-count-badge">🔗${linkCount}</span>` : '';
-  li.innerHTML = `<input type="checkbox" ${todo.done ? 'checked' : ''} />${priorityHtml}<span class="todo-text">${escapeHtml(todo.text)}</span>${badgeHtml}<button type="button" class="todo-edit-btn" title="編集">✏️</button><button type="button" class="todo-delete-btn" title="削除">🗑</button>`;
+  // PC版で設定した作成者タグ・補足メモを表示（スマホ版では表示のみ、編集はPC版で行う）
+  const authorHtml = todo.author ? `<span class="todo-author-badge">${escapeHtml(todo.author)}</span>` : '';
+  const noteHtml = todo.note ? `<div class="todo-note-line">${escapeHtml(todo.note)}</div>` : '';
+  li.innerHTML = `<input type="checkbox" ${todo.done ? 'checked' : ''} />${priorityHtml}<span class="todo-text">${escapeHtml(todo.text)}</span>${authorHtml}${badgeHtml}<button type="button" class="todo-edit-btn" title="編集">✏️</button><button type="button" class="todo-delete-btn" title="削除">🗑</button>${noteHtml}`;
   li.querySelector('input').addEventListener('change', (e) => {
     e.stopPropagation();
     toggleTodo(todo, e.target.checked);
