@@ -259,6 +259,28 @@
     cursor: pointer;
     flex-shrink: 0;
   }
+  .todo-edit-btn,
+  .todo-delete-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    font-size: 14px;
+    line-height: 1;
+    cursor: pointer;
+    flex-shrink: 0;
+    padding: 4px;
+  }
+  .todo-edit-btn { margin-left: auto; }
+  .todo-edit-input {
+    flex: 1;
+    padding: 6px 8px;
+    border-radius: 8px;
+    border: 1px solid var(--accent);
+    background: transparent;
+    color: var(--text-main);
+    font-size: 14px;
+    outline: none;
+  }
 
   li.note-row {
     display: flex;
@@ -1378,18 +1400,74 @@ function buildHomeTodoRow(todo) {
   const priorityHtml = todo.priority === 'high' ? '<span class="priority">❗</span>' : '';
   const linkCount = linkedNotePathsForTodo(todo.id).length;
   const badgeHtml = linkCount ? `<span class="link-count-badge">🔗${linkCount}</span>` : '';
-  li.innerHTML = `<input type="checkbox" ${todo.done ? 'checked' : ''} />${priorityHtml}<span class="todo-text">${escapeHtml(todo.text)}</span>${badgeHtml}`;
+  li.innerHTML = `<input type="checkbox" ${todo.done ? 'checked' : ''} />${priorityHtml}<span class="todo-text">${escapeHtml(todo.text)}</span>${badgeHtml}<button type="button" class="todo-edit-btn" title="編集">✏️</button><button type="button" class="todo-delete-btn" title="削除">🗑</button>`;
   li.querySelector('input').addEventListener('change', (e) => {
     e.stopPropagation();
     toggleTodo(todo, e.target.checked);
   });
+  li.querySelector('.todo-edit-btn').addEventListener('click', (e) => {
+    e.stopPropagation();
+    startEditHomeTodoRow(li, todo);
+  });
+  li.querySelector('.todo-delete-btn').addEventListener('click', async (e) => {
+    e.stopPropagation();
+    if (!confirm(`「${todo.text}」を削除しますか？`)) return;
+    await deleteTodoMobile(todo);
+  });
   li.addEventListener('click', (e) => {
-    if (e.target.tagName === 'INPUT') return;
+    if (e.target.tagName === 'INPUT' || e.target.closest('button')) return;
     showView('link');
     setLinkTab('todo');
     openLinkDetail('todo', todo.id);
   });
   return li;
+}
+
+// タップでその場編集（テキストのみ。優先度・紐づけの変更はここでは行わない）
+function startEditHomeTodoRow(li, todo) {
+  li.innerHTML = '';
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'todo-edit-input';
+  input.value = todo.text;
+  li.appendChild(input);
+  input.focus();
+  input.select();
+
+  let committed = false;
+  const commit = async () => {
+    if (committed) return;
+    committed = true;
+    const trimmed = input.value.trim();
+    if (trimmed && trimmed !== todo.text) {
+      todo.text = trimmed;
+      todo.updated = new Date().toISOString();
+      await writeTodos();
+    }
+    renderHome();
+  };
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      input.blur();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      committed = true;
+      renderHome();
+    }
+  });
+  input.addEventListener('blur', commit);
+}
+
+// 削除（紐づけデータも一緒に掃除する。PC版のremoveNoteLinksForTodo相当）
+async function deleteTodoMobile(todo) {
+  todos = todos.filter((t) => t.id !== todo.id);
+  const linkedBefore = noteLinks.length;
+  noteLinks = noteLinks.filter((l) => l.todoId !== todo.id);
+  renderHome();
+  renderCalendarView();
+  await writeTodos();
+  if (noteLinks.length !== linkedBefore) await writeNoteLinks();
 }
 
 function buildNoteRow(note) {
