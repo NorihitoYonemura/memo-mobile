@@ -258,6 +258,43 @@
     cursor: pointer;
   }
 
+  /* ---- かるいメモ（一時置き場） ---- */
+  #quick-add-form {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+  #quick-input {
+    padding: 10px 12px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-main);
+    font-size: 14px;
+    font-family: inherit;
+    outline: none;
+    resize: vertical;
+    min-height: 80px;
+  }
+  #quick-input:focus { border-color: var(--accent); }
+  li.quick-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    font-size: 13.5px;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .quick-item-date {
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+
   /* ---- メモ閲覧 ---- */
   #note-title-label {
     font-size: 18px;
@@ -361,6 +398,7 @@
     <nav class="tab-nav">
       <button id="nav-home-btn" class="active" data-view="home">🏠 ホーム</button>
       <button id="nav-todos-btn" data-view="todos">✅ やりたいこと</button>
+      <button id="nav-quick-btn" data-view="quick">📝 メモ</button>
     </nav>
 
     <main id="view-home" class="view">
@@ -401,6 +439,17 @@
       <ul id="todos-view-list" class="plain-list"></ul>
     </main>
 
+    <main id="view-quick" class="view" hidden>
+      <p class="hint" style="color:var(--text-muted);font-size:12.5px;margin-bottom:10px;">
+        思いついたことを気軽に書き留められる一時置き場です。あとでAIがまとめて提案に使う想定のメモなので、整形は不要です。
+      </p>
+      <form id="quick-add-form">
+        <textarea id="quick-input" placeholder="かるくメモ...（改行OK）" rows="4"></textarea>
+        <button type="submit" class="primary-btn">保存</button>
+      </form>
+      <ul id="quick-list" class="plain-list"></ul>
+    </main>
+
     <main id="view-settings" class="view" hidden>
       <p class="hint" style="color:var(--text-muted);font-size:12.5px;margin-bottom:14px;">接続設定を変更します。</p>
       <form id="settings-form">
@@ -433,11 +482,14 @@ const CONFIG_KEY = 'memo-mobile-github-sync';
 const TODOS_FILE = '.todos.json';
 const CATEGORIES_FILE = '.categories.json';
 const BRIEFING_PATH = '_ai/BRIEFING.md';
+const QUICK_NOTES_PATH = '_ai/QUICK_NOTES.json';
 
 let config = null;
 let categories = [];
 let todos = [];
 let todosSha = null;
+let quickNotes = [];
+let quickNotesSha = null;
 let notes = [];
 let treeByPath = new Map();
 
@@ -458,6 +510,7 @@ const themeToggleBtn = document.getElementById('theme-toggle-btn');
 const viewHome = document.getElementById('view-home');
 const viewNote = document.getElementById('view-note');
 const viewTodos = document.getElementById('view-todos');
+const viewQuick = document.getElementById('view-quick');
 const viewSettings = document.getElementById('view-settings');
 
 const todayLabelEl = document.getElementById('today-label');
@@ -475,6 +528,10 @@ const todoAddForm = document.getElementById('todo-add-form');
 const todoInputEl = document.getElementById('todo-input');
 const todosViewListEl = document.getElementById('todos-view-list');
 
+const quickAddForm = document.getElementById('quick-add-form');
+const quickInputEl = document.getElementById('quick-input');
+const quickListEl = document.getElementById('quick-list');
+
 const settingsForm = document.getElementById('settings-form');
 const settingsRepoInput = document.getElementById('settings-repo-input');
 const settingsBranchInput = document.getElementById('settings-branch-input');
@@ -483,6 +540,7 @@ const settingsCancelBtn = document.getElementById('settings-cancel-btn');
 
 const navHomeBtn = document.getElementById('nav-home-btn');
 const navTodosBtn = document.getElementById('nav-todos-btn');
+const navQuickBtn = document.getElementById('nav-quick-btn');
 
 // ---- 設定の読み書き（localStorageのみ。トークンをコードに埋め込まない） ----
 
@@ -641,6 +699,20 @@ async function loadAll() {
       // 書き込み時のsha競合チェック用に、Contents API側のsha（blob shaと同値）も取得しておく
       const viaContents = await fetchFileViaContents(TODOS_FILE);
       todosSha = viaContents ? viaContents.sha : entry.sha;
+    }
+
+    quickNotes = [];
+    quickNotesSha = null;
+    if (treeByPath.has(QUICK_NOTES_PATH)) {
+      const qEntry = treeByPath.get(QUICK_NOTES_PATH);
+      const bytes = await fetchBlob(qEntry.sha);
+      try {
+        quickNotes = JSON.parse(bytesToUtf8(bytes));
+      } catch (e) {
+        quickNotes = [];
+      }
+      const viaContentsQuick = await fetchFileViaContents(QUICK_NOTES_PATH);
+      quickNotesSha = viaContentsQuick ? viaContentsQuick.sha : qEntry.sha;
     }
 
     let briefingText = null;
@@ -934,20 +1006,132 @@ async function writeTodos() {
   }
 }
 
+// ---- かるいメモ（_ai/QUICK_NOTES.json、一時置き場） ----
+// 整形不要で気軽に書き留めるための機能。後でAIがまとめて要約・提案に使う想定のデータで、
+// PC版には入力UIが無く、GitHub同期のたびにPC側ローカルにも取り込まれる（app.js側の実装を参照）
+
+function renderQuickView() {
+  quickListEl.innerHTML = '';
+  if (quickNotes.length === 0) {
+    quickListEl.innerHTML = '<li class="empty">まだ何もありません。上のフォームから書き留めましょう。</li>';
+    return;
+  }
+  quickNotes.forEach((note) => {
+    const li = document.createElement('li');
+    li.className = 'quick-item';
+    const date = new Date(note.created);
+    const dateLabel = Number.isNaN(date.getTime()) ? '' : date.toLocaleString('ja-JP');
+    li.innerHTML = `<span>${escapeHtml(note.text)}</span><span class="quick-item-date">${dateLabel}</span>`;
+    quickListEl.appendChild(li);
+  });
+}
+
+quickAddForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const text = quickInputEl.value.trim();
+  if (!text) return;
+  const now = new Date().toISOString();
+  quickNotes.unshift({
+    id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    text,
+    created: now,
+  });
+  quickInputEl.value = '';
+  renderQuickView();
+  await writeQuickNotes();
+});
+
+// 両方にある項目はidでユニーク化するだけ（追記専用データのため内容の競合は起きない想定）
+function mergeQuickNotes(localList, remoteList) {
+  const seen = new Set();
+  const merged = [];
+  localList.forEach((n) => {
+    if (!seen.has(n.id)) {
+      merged.push(n);
+      seen.add(n.id);
+    }
+  });
+  remoteList.forEach((n) => {
+    if (!seen.has(n.id)) {
+      merged.push(n);
+      seen.add(n.id);
+    }
+  });
+  return merged;
+}
+
+// _ai/QUICK_NOTES.json への書き込み。sha不一致（409/422）の場合はリモートを取得してマージし、1回だけ再試行する
+async function writeQuickNotes() {
+  setStatus('保存中...');
+  try {
+    const body = {
+      message: 'mobile: update QUICK_NOTES.json',
+      content: bytesToBase64(utf8ToBytes(JSON.stringify(quickNotes, null, 2))),
+      branch: config.branch,
+    };
+    if (quickNotesSha) body.sha = quickNotesSha;
+
+    let res = await ghFetch(`/contents/${encodeApiPath(QUICK_NOTES_PATH)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+
+    if ((res.status === 409 || res.status === 422) && quickNotesSha) {
+      const latest = await fetchFileViaContents(QUICK_NOTES_PATH);
+      if (latest) {
+        let remoteNotes = [];
+        try {
+          remoteNotes = JSON.parse(bytesToUtf8(latest.bytes));
+        } catch (e) {
+          remoteNotes = [];
+        }
+        quickNotes = mergeQuickNotes(quickNotes, remoteNotes);
+        renderQuickView();
+        const retryBody = {
+          ...body,
+          sha: latest.sha,
+          content: bytesToBase64(utf8ToBytes(JSON.stringify(quickNotes, null, 2))),
+        };
+        res = await ghFetch(`/contents/${encodeApiPath(QUICK_NOTES_PATH)}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(retryBody),
+        });
+      }
+    }
+
+    if (!res.ok) {
+      const errText = await res.text().catch(() => '');
+      throw new Error(`保存に失敗しました（${res.status}）${errText ? `: ${errText}` : ''}`);
+    }
+    const data = await res.json();
+    quickNotesSha = data.content.sha;
+    setStatus(null);
+  } catch (e) {
+    console.error(e);
+    setStatus(`保存に失敗しました。オフラインまたはトークンが失効している可能性があります。（${e.message || e}）`, true);
+  }
+}
+
 // ---- 画面切り替え ----
 
 function showView(view) {
   viewHome.hidden = view !== 'home';
   viewNote.hidden = view !== 'note';
   viewTodos.hidden = view !== 'todos';
+  viewQuick.hidden = view !== 'quick';
   viewSettings.hidden = view !== 'settings';
   navHomeBtn.classList.toggle('active', view === 'home');
   navTodosBtn.classList.toggle('active', view === 'todos');
+  navQuickBtn.classList.toggle('active', view === 'quick');
   if (view === 'todos') renderTodosView();
+  if (view === 'quick') renderQuickView();
 }
 
 navHomeBtn.addEventListener('click', () => showView('home'));
 navTodosBtn.addEventListener('click', () => showView('todos'));
+navQuickBtn.addEventListener('click', () => showView('quick'));
 noteBackBtn.addEventListener('click', () => showView('home'));
 
 refreshBtn.addEventListener('click', () => loadAll());
