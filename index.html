@@ -215,6 +215,16 @@
     flex-shrink: 0;
   }
   .priority { color: var(--danger); flex-shrink: 0; }
+  .cal-unschedule-btn {
+    margin-left: auto;
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    font-size: 15px;
+    line-height: 1;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
 
   li.note-row {
     display: flex;
@@ -258,40 +268,115 @@
     cursor: pointer;
   }
 
-  /* ---- かるいメモ（一時置き場） ---- */
-  #quick-add-form {
+  /* ---- カレンダー（予定） ---- */
+  .cal-header {
     display: flex;
-    flex-direction: column;
-    gap: 8px;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+  }
+  .cal-month-label {
+    font-size: 15px;
+    font-weight: 700;
+  }
+  .cal-weekdays {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    margin-bottom: 4px;
+  }
+  .cal-weekdays span {
+    text-align: center;
+    font-size: 10.5px;
+    color: var(--text-muted);
+  }
+  .cal-weekdays span.sun { color: var(--danger); }
+  .cal-weekdays span.sat { color: #4a90e2; }
+  .cal-grid {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 3px;
     margin-bottom: 16px;
   }
+  .cal-day {
+    min-height: 46px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    padding: 3px 2px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    font-size: 11px;
+    cursor: pointer;
+  }
+  .cal-day.outside { opacity: 0.3; }
+  .cal-day.today { border-color: var(--accent); }
+  .cal-day.selected { background: var(--border); }
+  .cal-day.sun { color: var(--danger); }
+  .cal-day.sat { color: #4a90e2; }
+  .cal-day-holiday {
+    font-size: 8px;
+    color: var(--danger);
+    line-height: 1.1;
+    text-align: center;
+  }
+  .cal-day-dot {
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: var(--accent);
+  }
+  .cal-day-detail {
+    border-top: 1px solid var(--border);
+    padding-top: 12px;
+  }
+  .cal-day-detail-label {
+    font-size: 13px;
+    font-weight: 700;
+    margin: 0 0 10px;
+  }
+  #cal-day-add-select {
+    width: 100%;
+    margin-top: 10px;
+    padding: 9px 10px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--bg-panel);
+    color: var(--text-main);
+    font-size: 13px;
+  }
+
+  /* ---- デイリーノート ---- */
+  #view-quick {
+    display: flex;
+    flex-direction: column;
+  }
   #quick-input {
-    padding: 10px 12px;
+    flex: 1;
+    width: 100%;
+    padding: 12px;
     border-radius: 8px;
     border: 1px solid var(--border);
     background: transparent;
     color: var(--text-main);
-    font-size: 14px;
+    font-size: 14.5px;
+    line-height: 1.7;
     font-family: inherit;
     outline: none;
-    resize: vertical;
-    min-height: 80px;
+    resize: none;
+    min-height: 200px;
+    margin-bottom: 10px;
   }
   #quick-input:focus { border-color: var(--accent); }
-  li.quick-item {
+  .quick-save-row {
     display: flex;
-    flex-direction: column;
-    gap: 4px;
-    padding: 10px 12px;
-    border-radius: 8px;
-    background: var(--bg-panel);
-    border: 1px solid var(--border);
-    font-size: 13.5px;
-    white-space: pre-wrap;
-    word-break: break-word;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+    flex-shrink: 0;
   }
-  .quick-item-date {
-    font-size: 11px;
+  .quick-save-status {
+    font-size: 11.5px;
     color: var(--text-muted);
   }
 
@@ -398,7 +483,8 @@
     <nav class="tab-nav">
       <button id="nav-home-btn" class="active" data-view="home">🏠 ホーム</button>
       <button id="nav-todos-btn" data-view="todos">✅ やりたいこと</button>
-      <button id="nav-quick-btn" data-view="quick">📝 メモ</button>
+      <button id="nav-calendar-btn" data-view="calendar">🗓 予定</button>
+      <button id="nav-quick-btn" data-view="quick">📅 デイリー</button>
     </nav>
 
     <main id="view-home" class="view">
@@ -439,15 +525,30 @@
       <ul id="todos-view-list" class="plain-list"></ul>
     </main>
 
+    <main id="view-calendar" class="view" hidden>
+      <div class="cal-header">
+        <button type="button" id="cal-prev-btn" class="icon-btn">←</button>
+        <span id="cal-month-label" class="cal-month-label"></span>
+        <button type="button" id="cal-next-btn" class="icon-btn">→</button>
+      </div>
+      <div id="cal-weekdays" class="cal-weekdays"></div>
+      <div id="cal-grid" class="cal-grid"></div>
+      <div id="cal-day-detail" class="cal-day-detail" hidden>
+        <p id="cal-day-detail-label" class="cal-day-detail-label"></p>
+        <ul id="cal-day-todo-list" class="plain-list"></ul>
+        <select id="cal-day-add-select">
+          <option value="">＋ 未予定のやりたいことを追加...</option>
+        </select>
+      </div>
+    </main>
+
     <main id="view-quick" class="view" hidden>
-      <p class="hint" style="color:var(--text-muted);font-size:12.5px;margin-bottom:10px;">
-        思いついたことを気軽に書き留められる一時置き場です。あとでAIがまとめて提案に使う想定のメモなので、整形は不要です。
-      </p>
-      <form id="quick-add-form">
-        <textarea id="quick-input" placeholder="かるくメモ...（改行OK）" rows="4"></textarea>
-        <button type="submit" class="primary-btn">保存</button>
-      </form>
-      <ul id="quick-list" class="plain-list"></ul>
+      <p id="quick-date-label" class="today-label"></p>
+      <textarea id="quick-input" placeholder="今日のことを書く...（保存すると通常のメモと同じ扱いになります）"></textarea>
+      <div class="quick-save-row">
+        <span id="quick-save-status" class="quick-save-status"></span>
+        <button type="button" id="quick-save-btn" class="primary-btn">保存</button>
+      </div>
     </main>
 
     <main id="view-settings" class="view" hidden>
@@ -482,16 +583,18 @@ const CONFIG_KEY = 'memo-mobile-github-sync';
 const TODOS_FILE = '.todos.json';
 const CATEGORIES_FILE = '.categories.json';
 const BRIEFING_PATH = '_ai/BRIEFING.md';
-const QUICK_NOTES_PATH = '_ai/QUICK_NOTES.json';
 
 let config = null;
 let categories = [];
 let todos = [];
 let todosSha = null;
-let quickNotes = [];
-let quickNotesSha = null;
 let notes = [];
 let treeByPath = new Map();
+let dailyNoteSha = null;
+let dailyNotePath = null;
+let calendarViewDate = new Date();
+let selectedDayKey = null;
+const holidayCache = new Map();
 
 // ---- DOM参照 ----
 const setupScreen = document.getElementById('setup-screen');
@@ -528,9 +631,10 @@ const todoAddForm = document.getElementById('todo-add-form');
 const todoInputEl = document.getElementById('todo-input');
 const todosViewListEl = document.getElementById('todos-view-list');
 
-const quickAddForm = document.getElementById('quick-add-form');
+const quickDateLabelEl = document.getElementById('quick-date-label');
 const quickInputEl = document.getElementById('quick-input');
-const quickListEl = document.getElementById('quick-list');
+const quickSaveBtn = document.getElementById('quick-save-btn');
+const quickSaveStatusEl = document.getElementById('quick-save-status');
 
 const settingsForm = document.getElementById('settings-form');
 const settingsRepoInput = document.getElementById('settings-repo-input');
@@ -540,7 +644,19 @@ const settingsCancelBtn = document.getElementById('settings-cancel-btn');
 
 const navHomeBtn = document.getElementById('nav-home-btn');
 const navTodosBtn = document.getElementById('nav-todos-btn');
+const navCalendarBtn = document.getElementById('nav-calendar-btn');
 const navQuickBtn = document.getElementById('nav-quick-btn');
+
+const viewCalendar = document.getElementById('view-calendar');
+const calPrevBtn = document.getElementById('cal-prev-btn');
+const calNextBtn = document.getElementById('cal-next-btn');
+const calMonthLabelEl = document.getElementById('cal-month-label');
+const calWeekdaysEl = document.getElementById('cal-weekdays');
+const calGridEl = document.getElementById('cal-grid');
+const calDayDetailEl = document.getElementById('cal-day-detail');
+const calDayDetailLabelEl = document.getElementById('cal-day-detail-label');
+const calDayTodoListEl = document.getElementById('cal-day-todo-list');
+const calDayAddSelectEl = document.getElementById('cal-day-add-select');
 
 // ---- 設定の読み書き（localStorageのみ。トークンをコードに埋め込まない） ----
 
@@ -638,16 +754,18 @@ async function fetchFileViaContents(path) {
 
 function parseNote(content, fallbackTitle) {
   const m = content.match(/^---\s*\n([\s\S]*?)\n---\s*\n?([\s\S]*)$/);
-  if (!m) return { title: fallbackTitle, category: '', pinned: false, body: content };
+  if (!m) return { title: fallbackTitle, category: '', pinned: false, archived: false, body: content };
   const fm = m[1];
   const body = m[2].replace(/^\n+/, '');
   const titleLine = fm.split('\n').find((l) => l.trim().startsWith('title:'));
   const categoryLine = fm.split('\n').find((l) => l.trim().startsWith('category:'));
   const pinnedLine = fm.split('\n').find((l) => l.trim().startsWith('pinned:'));
+  const archivedLine = fm.split('\n').find((l) => l.trim().startsWith('archived:'));
   const title = titleLine ? titleLine.split('title:')[1].trim().replace(/^['"]|['"]$/g, '') : fallbackTitle;
   const category = categoryLine ? categoryLine.split('category:')[1].trim().replace(/^['"]|['"]$/g, '') : '';
   const pinned = pinnedLine ? pinnedLine.split('pinned:')[1].trim() === 'true' : false;
-  return { title, category, pinned, body };
+  const archived = archivedLine ? archivedLine.split('archived:')[1].trim() === 'true' : false;
+  return { title, category, pinned, archived, body };
 }
 
 function getCategory(id) {
@@ -701,20 +819,6 @@ async function loadAll() {
       todosSha = viaContents ? viaContents.sha : entry.sha;
     }
 
-    quickNotes = [];
-    quickNotesSha = null;
-    if (treeByPath.has(QUICK_NOTES_PATH)) {
-      const qEntry = treeByPath.get(QUICK_NOTES_PATH);
-      const bytes = await fetchBlob(qEntry.sha);
-      try {
-        quickNotes = JSON.parse(bytesToUtf8(bytes));
-      } catch (e) {
-        quickNotes = [];
-      }
-      const viaContentsQuick = await fetchFileViaContents(QUICK_NOTES_PATH);
-      quickNotesSha = viaContentsQuick ? viaContentsQuick.sha : qEntry.sha;
-    }
-
     let briefingText = null;
     if (treeByPath.has(BRIEFING_PATH)) {
       const bytes = await fetchBlob(treeByPath.get(BRIEFING_PATH).sha);
@@ -722,7 +826,7 @@ async function loadAll() {
     }
 
     const noteEntries = tree.filter((e) => e.path.endsWith('.md') && !e.path.includes('/'));
-    notes = await Promise.all(
+    const allNotes = await Promise.all(
       noteEntries.map(async (e) => {
         const bytes = await fetchBlob(e.sha);
         const content = bytesToUtf8(bytes);
@@ -730,6 +834,8 @@ async function loadAll() {
         return { path: e.path, sha: e.sha, ...parsed };
       })
     );
+    // アーカイブ済み（PC版で🗄アーカイブに入れたもの）はスマホの一覧にも出さない
+    notes = allNotes.filter((n) => !n.archived);
     notes.sort((a, b) => {
       if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
       return a.title.localeCompare(b.title, 'ja');
@@ -756,6 +862,197 @@ const WEEKDAYS_JA = ['日', '月', '火', '水', '木', '金', '土'];
 function formatToday(date) {
   return `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日（${WEEKDAYS_JA[date.getDay()]}）`;
 }
+
+// ---- 日本の祝日計算（PC版app.jsと同じロジック。コード共有の仕組みが無いため重複） ----
+
+function dateKey(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function nthWeekdayOfMonth(year, month, weekday, n) {
+  const first = new Date(year, month - 1, 1);
+  const day = 1 + ((weekday - first.getDay() + 7) % 7) + (n - 1) * 7;
+  return new Date(year, month - 1, day);
+}
+
+function equinoxDay(year, isVernal) {
+  const base = isVernal ? 20.8431 : 23.2488;
+  const day = Math.floor(base + 0.242194 * (year - 1980) - Math.floor((year - 1980) / 4));
+  return new Date(year, isVernal ? 2 : 8, day);
+}
+
+function getJapaneseHolidays(year) {
+  if (holidayCache.has(year)) return holidayCache.get(year);
+  const map = new Map();
+  const add = (date, name) => map.set(dateKey(date), name);
+  add(new Date(year, 0, 1), '元日');
+  add(nthWeekdayOfMonth(year, 1, 1, 2), '成人の日');
+  add(new Date(year, 1, 11), '建国記念の日');
+  add(new Date(year, 1, 23), '天皇誕生日');
+  add(equinoxDay(year, true), '春分の日');
+  add(new Date(year, 3, 29), '昭和の日');
+  add(new Date(year, 4, 3), '憲法記念日');
+  add(new Date(year, 4, 4), 'みどりの日');
+  add(new Date(year, 4, 5), 'こどもの日');
+  add(nthWeekdayOfMonth(year, 7, 1, 3), '海の日');
+  add(new Date(year, 7, 11), '山の日');
+  add(nthWeekdayOfMonth(year, 9, 1, 3), '敬老の日');
+  add(equinoxDay(year, false), '秋分の日');
+  add(nthWeekdayOfMonth(year, 10, 1, 2), 'スポーツの日');
+  add(new Date(year, 10, 3), '文化の日');
+  add(new Date(year, 10, 23), '勤労感謝の日');
+  [...map.entries()].forEach(([key, name]) => {
+    const [y, m, d] = key.split('-').map(Number);
+    const date = new Date(y, m - 1, d);
+    if (date.getDay() !== 0) return;
+    const next = new Date(date);
+    do { next.setDate(next.getDate() + 1); } while (map.has(dateKey(next)));
+    map.set(dateKey(next), '振替休日');
+  });
+  holidayCache.set(year, map);
+  return map;
+}
+
+// ---- カレンダー（予定）。ドラッグ操作は使わず、タップして日付を選び、そこにやりたいことを割り当てる方式 ----
+
+function renderCalendarView() {
+  const year = calendarViewDate.getFullYear();
+  const month = calendarViewDate.getMonth();
+  calMonthLabelEl.textContent = `${year}年${month + 1}月`;
+
+  if (!calWeekdaysEl.childElementCount) {
+    WEEKDAYS_JA.forEach((w, i) => {
+      const span = document.createElement('span');
+      span.textContent = w;
+      if (i === 0) span.className = 'sun';
+      if (i === 6) span.className = 'sat';
+      calWeekdaysEl.appendChild(span);
+    });
+  }
+
+  const holidaysThisYear = getJapaneseHolidays(year);
+  const holidaysPrevYear = month === 0 ? getJapaneseHolidays(year - 1) : holidaysThisYear;
+  const holidaysNextYear = month === 11 ? getJapaneseHolidays(year + 1) : holidaysThisYear;
+
+  const firstOfMonth = new Date(year, month, 1);
+  const gridStart = new Date(year, month, 1 - firstOfMonth.getDay());
+  const todayKey = dateKey(new Date());
+
+  const todosByDate = new Map();
+  todos.forEach((t) => {
+    if (!t.scheduledDate) return;
+    if (!todosByDate.has(t.scheduledDate)) todosByDate.set(t.scheduledDate, []);
+    todosByDate.get(t.scheduledDate).push(t);
+  });
+
+  calGridEl.innerHTML = '';
+  for (let i = 0; i < 42; i++) {
+    const cellDate = new Date(gridStart);
+    cellDate.setDate(gridStart.getDate() + i);
+    const key = dateKey(cellDate);
+    const dow = cellDate.getDay();
+    const cell = document.createElement('div');
+    const classes = ['cal-day'];
+    if (cellDate.getMonth() !== month) classes.push('outside');
+    if (key === todayKey) classes.push('today');
+    if (key === selectedDayKey) classes.push('selected');
+    if (dow === 0) classes.push('sun');
+    if (dow === 6) classes.push('sat');
+    cell.className = classes.join(' ');
+
+    const numSpan = document.createElement('span');
+    numSpan.textContent = String(cellDate.getDate());
+    cell.appendChild(numSpan);
+
+    const holidayMap = cellDate.getFullYear() < year ? holidaysPrevYear : cellDate.getFullYear() > year ? holidaysNextYear : holidaysThisYear;
+    const holidayName = holidayMap.get(key);
+    if (holidayName) {
+      const h = document.createElement('span');
+      h.className = 'cal-day-holiday';
+      h.textContent = holidayName;
+      cell.appendChild(h);
+    }
+    if (todosByDate.has(key)) {
+      const dot = document.createElement('span');
+      dot.className = 'cal-day-dot';
+      cell.appendChild(dot);
+    }
+
+    cell.addEventListener('click', () => {
+      selectedDayKey = key;
+      renderCalendarView();
+      renderDayDetail();
+    });
+    calGridEl.appendChild(cell);
+  }
+}
+
+function renderDayDetail() {
+  if (!selectedDayKey) {
+    calDayDetailEl.hidden = true;
+    return;
+  }
+  calDayDetailEl.hidden = false;
+  const [y, m, d] = selectedDayKey.split('-').map(Number);
+  const label = formatToday(new Date(y, m - 1, d));
+  calDayDetailLabelEl.textContent = label;
+
+  const dayTodos = todos.filter((t) => t.scheduledDate === selectedDayKey);
+  calDayTodoListEl.innerHTML = '';
+  if (dayTodos.length === 0) {
+    calDayTodoListEl.innerHTML = '<li class="empty">この日の予定はありません。</li>';
+  } else {
+    dayTodos.forEach((todo) => {
+      const li = document.createElement('li');
+      li.className = `todo-item${todo.done ? ' done' : ''}`;
+      const priorityHtml = todo.priority === 'high' ? '<span class="priority">❗</span>' : '';
+      li.innerHTML = `<input type="checkbox" ${todo.done ? 'checked' : ''} />${priorityHtml}<span class="todo-text">${escapeHtml(todo.text)}</span><button type="button" class="cal-unschedule-btn" title="予定解除">×</button>`;
+      li.querySelector('input').addEventListener('change', (e) => toggleTodo(todo, e.target.checked));
+      li.querySelector('.cal-unschedule-btn').addEventListener('click', async (e) => {
+        e.stopPropagation();
+        delete todo.scheduledDate;
+        todo.updated = new Date().toISOString();
+        renderDayDetail();
+        renderCalendarView();
+        await writeTodos();
+      });
+      calDayTodoListEl.appendChild(li);
+    });
+  }
+
+  // 未予定のやりたいことをこの日に追加できるセレクトを作る
+  calDayAddSelectEl.innerHTML = '<option value="">＋ 未予定のやりたいことを追加...</option>';
+  todos
+    .filter((t) => !t.scheduledDate)
+    .forEach((t) => {
+      const opt = document.createElement('option');
+      opt.value = t.id;
+      opt.textContent = t.text;
+      calDayAddSelectEl.appendChild(opt);
+    });
+}
+
+calDayAddSelectEl.addEventListener('change', async () => {
+  const id = calDayAddSelectEl.value;
+  if (!id || !selectedDayKey) return;
+  const todo = todos.find((t) => t.id === id);
+  if (!todo) return;
+  todo.scheduledDate = selectedDayKey;
+  todo.updated = new Date().toISOString();
+  calDayAddSelectEl.value = '';
+  renderDayDetail();
+  renderCalendarView();
+  await writeTodos();
+});
+
+calPrevBtn.addEventListener('click', () => {
+  calendarViewDate = new Date(calendarViewDate.getFullYear(), calendarViewDate.getMonth() - 1, 1);
+  renderCalendarView();
+});
+calNextBtn.addEventListener('click', () => {
+  calendarViewDate = new Date(calendarViewDate.getFullYear(), calendarViewDate.getMonth() + 1, 1);
+  renderCalendarView();
+});
 
 function renderHome() {
   todayLabelEl.textContent = formatToday(new Date());
@@ -1006,99 +1303,63 @@ async function writeTodos() {
   }
 }
 
-// ---- かるいメモ（_ai/QUICK_NOTES.json、一時置き場） ----
-// 整形不要で気軽に書き留めるための機能。後でAIがまとめて要約・提案に使う想定のデータで、
-// PC版には入力UIが無く、GitHub同期のたびにPC側ローカルにも取り込まれる（app.js側の実装を参照）
+// ---- デイリーノート（今日の日付の通常メモを開いて編集） ----
+// PC版と同じfrontmatter形式の.mdファイルとして保存する（例: 2026-07-11.md）。
+// スマホ限定の特別なデータではなく、他のメモと同じ扱いで一覧・検索・カテゴリー分けの対象になる。
+// PC側はGitHub同期のたびに「ローカルに無い日付ファイルだけ」取り込む（app.js側の実装を参照）。
+// 同じ日のメモをPC・スマホ両方で編集して同期すると、後から同期した方が上書きする点に注意（自動マージはしない）
+
+function todayDateStr() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function serializeNote({ title, created, category, pinned, archived, body }) {
+  const categoryLine = category ? `\ncategory: ${category}` : '';
+  const pinnedLine = pinned ? `\npinned: true` : '';
+  const archivedLine = archived ? `\narchived: true` : '';
+  return `---\ntitle: ${title || 'untitled'}\ncreated: ${created || new Date().toISOString()}${categoryLine}${pinnedLine}${archivedLine}\n---\n\n${body || ''}`;
+}
 
 function renderQuickView() {
-  quickListEl.innerHTML = '';
-  if (quickNotes.length === 0) {
-    quickListEl.innerHTML = '<li class="empty">まだ何もありません。上のフォームから書き留めましょう。</li>';
-    return;
-  }
-  quickNotes.forEach((note) => {
-    const li = document.createElement('li');
-    li.className = 'quick-item';
-    const date = new Date(note.created);
-    const dateLabel = Number.isNaN(date.getTime()) ? '' : date.toLocaleString('ja-JP');
-    li.innerHTML = `<span>${escapeHtml(note.text)}</span><span class="quick-item-date">${dateLabel}</span>`;
-    quickListEl.appendChild(li);
-  });
+  const dateStr = todayDateStr();
+  dailyNotePath = `${dateStr}.md`;
+  quickDateLabelEl.textContent = formatToday(new Date());
+  const existing = notes.find((n) => n.path === dailyNotePath);
+  dailyNoteSha = existing ? existing.sha : null;
+  quickInputEl.value = existing ? existing.body || '' : '';
+  quickSaveStatusEl.textContent = '';
 }
 
-quickAddForm.addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const text = quickInputEl.value.trim();
-  if (!text) return;
-  const now = new Date().toISOString();
-  quickNotes.unshift({
-    id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-    text,
-    created: now,
-  });
-  quickInputEl.value = '';
-  renderQuickView();
-  await writeQuickNotes();
-});
-
-// 両方にある項目はidでユニーク化するだけ（追記専用データのため内容の競合は起きない想定）
-function mergeQuickNotes(localList, remoteList) {
-  const seen = new Set();
-  const merged = [];
-  localList.forEach((n) => {
-    if (!seen.has(n.id)) {
-      merged.push(n);
-      seen.add(n.id);
-    }
-  });
-  remoteList.forEach((n) => {
-    if (!seen.has(n.id)) {
-      merged.push(n);
-      seen.add(n.id);
-    }
-  });
-  return merged;
-}
-
-// _ai/QUICK_NOTES.json への書き込み。sha不一致（409/422）の場合はリモートを取得してマージし、1回だけ再試行する
-async function writeQuickNotes() {
-  setStatus('保存中...');
+async function saveDailyNote() {
+  const dateStr = todayDateStr();
+  dailyNotePath = `${dateStr}.md`;
+  const bodyText = quickInputEl.value;
+  const content = serializeNote({ title: dateStr, created: new Date().toISOString(), category: '', pinned: false, archived: false, body: bodyText });
+  quickSaveStatusEl.textContent = '保存中...';
   try {
-    const body = {
-      message: 'mobile: update QUICK_NOTES.json',
-      content: bytesToBase64(utf8ToBytes(JSON.stringify(quickNotes, null, 2))),
+    const payload = {
+      message: `mobile: update daily note ${dateStr}`,
+      content: bytesToBase64(utf8ToBytes(content)),
       branch: config.branch,
     };
-    if (quickNotesSha) body.sha = quickNotesSha;
+    if (dailyNoteSha) payload.sha = dailyNoteSha;
 
-    let res = await ghFetch(`/contents/${encodeApiPath(QUICK_NOTES_PATH)}`, {
+    let res = await ghFetch(`/contents/${encodeApiPath(dailyNotePath)}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
+      body: JSON.stringify(payload),
     });
 
-    if ((res.status === 409 || res.status === 422) && quickNotesSha) {
-      const latest = await fetchFileViaContents(QUICK_NOTES_PATH);
-      if (latest) {
-        let remoteNotes = [];
-        try {
-          remoteNotes = JSON.parse(bytesToUtf8(latest.bytes));
-        } catch (e) {
-          remoteNotes = [];
-        }
-        quickNotes = mergeQuickNotes(quickNotes, remoteNotes);
-        renderQuickView();
-        const retryBody = {
-          ...body,
-          sha: latest.sha,
-          content: bytesToBase64(utf8ToBytes(JSON.stringify(quickNotes, null, 2))),
-        };
-        res = await ghFetch(`/contents/${encodeApiPath(QUICK_NOTES_PATH)}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(retryBody),
-        });
-      }
+    if (res.status === 409 || res.status === 422) {
+      const latest = await fetchFileViaContents(dailyNotePath);
+      const retryPayload = { ...payload };
+      if (latest) retryPayload.sha = latest.sha;
+      res = await ghFetch(`/contents/${encodeApiPath(dailyNotePath)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(retryPayload),
+      });
     }
 
     if (!res.ok) {
@@ -1106,13 +1367,21 @@ async function writeQuickNotes() {
       throw new Error(`保存に失敗しました（${res.status}）${errText ? `: ${errText}` : ''}`);
     }
     const data = await res.json();
-    quickNotesSha = data.content.sha;
-    setStatus(null);
+    dailyNoteSha = data.content.sha;
+    quickSaveStatusEl.textContent = `保存しました（${new Date().toLocaleTimeString('ja-JP')}）`;
+
+    // notes配列にも反映（ホーム画面の最近更新等に古い内容のまま出ないように）
+    const entry = { path: dailyNotePath, sha: dailyNoteSha, title: dateStr, category: '', pinned: false, archived: false, body: bodyText };
+    const idx = notes.findIndex((n) => n.path === dailyNotePath);
+    if (idx >= 0) notes[idx] = entry;
+    else notes.unshift(entry);
   } catch (e) {
     console.error(e);
-    setStatus(`保存に失敗しました。オフラインまたはトークンが失効している可能性があります。（${e.message || e}）`, true);
+    quickSaveStatusEl.textContent = `保存に失敗しました（${e.message || e}）`;
   }
 }
+
+quickSaveBtn.addEventListener('click', saveDailyNote);
 
 // ---- 画面切り替え ----
 
@@ -1120,17 +1389,21 @@ function showView(view) {
   viewHome.hidden = view !== 'home';
   viewNote.hidden = view !== 'note';
   viewTodos.hidden = view !== 'todos';
+  viewCalendar.hidden = view !== 'calendar';
   viewQuick.hidden = view !== 'quick';
   viewSettings.hidden = view !== 'settings';
   navHomeBtn.classList.toggle('active', view === 'home');
   navTodosBtn.classList.toggle('active', view === 'todos');
+  navCalendarBtn.classList.toggle('active', view === 'calendar');
   navQuickBtn.classList.toggle('active', view === 'quick');
   if (view === 'todos') renderTodosView();
+  if (view === 'calendar') { renderCalendarView(); renderDayDetail(); }
   if (view === 'quick') renderQuickView();
 }
 
 navHomeBtn.addEventListener('click', () => showView('home'));
 navTodosBtn.addEventListener('click', () => showView('todos'));
+navCalendarBtn.addEventListener('click', () => showView('calendar'));
 navQuickBtn.addEventListener('click', () => showView('quick'));
 noteBackBtn.addEventListener('click', () => showView('home'));
 
