@@ -16,6 +16,17 @@
     --accent-hover: #8f81f5;
     --danger: #e0555a;
   }
+  html[data-theme="light"] {
+    --bg-main: #f4f4f7;
+    --bg-panel: #ffffff;
+    --text-main: #1c1e26;
+    --text-muted: #6b6f7d;
+    --border: #e2e2e8;
+    --accent: #6c63ff;
+    --accent-hover: #5a51e6;
+    --danger: #d1383d;
+  }
+  html, body { transition: background 0.15s ease, color 0.15s ease; }
   * { box-sizing: border-box; }
   html, body {
     margin: 0;
@@ -340,6 +351,7 @@
     <header class="top-bar">
       <h1 id="header-title">memo</h1>
       <div class="top-bar-actions">
+        <button id="theme-toggle-btn" class="icon-btn" title="表示切替">🌙</button>
         <button id="refresh-btn" class="icon-btn" title="再読み込み">🔄</button>
         <button id="settings-btn" class="icon-btn" title="接続設定">⚙️</button>
       </div>
@@ -441,6 +453,7 @@ const appEl = document.getElementById('app');
 const statusBanner = document.getElementById('status-banner');
 const refreshBtn = document.getElementById('refresh-btn');
 const settingsBtn = document.getElementById('settings-btn');
+const themeToggleBtn = document.getElementById('theme-toggle-btn');
 
 const viewHome = document.getElementById('view-home');
 const viewNote = document.getElementById('view-note');
@@ -938,6 +951,25 @@ navTodosBtn.addEventListener('click', () => showView('todos'));
 noteBackBtn.addEventListener('click', () => showView('home'));
 
 refreshBtn.addEventListener('click', () => loadAll());
+
+// ---- ライト/ダーク表示切替 ----
+
+const THEME_KEY = 'memo-mobile-theme';
+
+function applyTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  themeToggleBtn.textContent = theme === 'light' ? '☀️' : '🌙';
+  themeToggleBtn.title = theme === 'light' ? 'ダーク表示に切替' : 'ライト表示に切替';
+}
+
+themeToggleBtn.addEventListener('click', () => {
+  const current = document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
+  const next = current === 'light' ? 'dark' : 'light';
+  localStorage.setItem(THEME_KEY, next);
+  applyTheme(next);
+});
+
+applyTheme(localStorage.getItem(THEME_KEY) || 'dark');
 
 settingsBtn.addEventListener('click', () => {
   settingsRepoInput.value = config ? `${config.owner}/${config.repo}` : '';
