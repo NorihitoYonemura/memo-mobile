@@ -223,6 +223,34 @@
     margin: 0 0 14px;
   }
 
+  .pull-refresh-indicator {
+    height: 0;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+
+  .home-search-wrap {
+    margin: 0 0 14px;
+  }
+  .home-search-input {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 10px 12px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--bg-panel);
+    color: var(--text-main);
+    font-size: 14px;
+    outline: none;
+  }
+  .home-search-input:focus {
+    border-color: var(--accent);
+  }
+
   ul.plain-list {
     list-style: none;
     margin: 0;
@@ -284,13 +312,18 @@
 
   li.note-row {
     display: flex;
-    align-items: center;
-    gap: 8px;
+    flex-direction: column;
+    gap: 2px;
     padding: 10px 8px;
     border-radius: 8px;
     cursor: pointer;
   }
   li.note-row:active { background: var(--border); }
+  .note-row-main {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
   .dot {
     width: 8px;
     height: 8px;
@@ -298,6 +331,14 @@
     flex-shrink: 0;
   }
   .note-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .note-excerpt {
+    font-size: 11px;
+    color: var(--text-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    padding-left: 16px;
+  }
 
   #todo-add-form {
     display: flex;
@@ -726,7 +767,12 @@
     </nav>
 
     <main id="view-home" class="view">
+      <div id="pull-refresh-indicator" class="pull-refresh-indicator">↓ 引っ張って更新</div>
       <p id="today-label" class="today-label"></p>
+
+      <div class="home-search-wrap">
+        <input id="home-search-input" type="text" class="home-search-input" placeholder="メモを検索..." />
+      </div>
 
       <section class="card">
         <h2>やること</h2>
@@ -852,6 +898,7 @@ let noteLinksSha = null;
 let notes = [];
 let treeByPath = new Map();
 let linkActiveTab = 'todo';
+let homeSearchQuery = '';
 let linkDetailKind = null;
 let linkDetailId = null;
 let dailyNoteSha = null;
@@ -880,6 +927,8 @@ const viewQuick = document.getElementById('view-quick');
 const viewSettings = document.getElementById('view-settings');
 
 const todayLabelEl = document.getElementById('today-label');
+const pullRefreshIndicatorEl = document.getElementById('pull-refresh-indicator');
+const homeSearchInputEl = document.getElementById('home-search-input');
 const homeTodoListEl = document.getElementById('home-todo-list');
 const briefingCard = document.getElementById('briefing-card');
 const briefingBodyEl = document.getElementById('briefing-body');
@@ -1274,6 +1323,8 @@ function renderCalendarView() {
       selectedDayKey = key;
       renderCalendarView();
       renderDayDetail();
+      // 日付をタップしたあと、下に出る詳細パネルの存在に気づけるよう自動スクロールする
+      calDayDetailEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     });
     calGridEl.appendChild(cell);
   }
@@ -1378,20 +1429,54 @@ function renderHome() {
     todos.forEach((t) => homeTodoListEl.appendChild(buildHomeTodoRow(t)));
   }
 
-  const pinned = notes.filter((n) => n.pinned);
+  const query = homeSearchQuery.trim();
+  const matchesQuery = query ? buildNoteMatcher(query) : null;
+
+  const pinnedSource = matchesQuery ? notes.filter((n) => n.pinned && matchesQuery(n)) : notes.filter((n) => n.pinned);
   pinnedListEl.innerHTML = '';
-  if (pinned.length === 0) {
-    pinnedListEl.innerHTML = '<li class="empty">ピン留めメモはありません。</li>';
+  if (pinnedSource.length === 0) {
+    pinnedListEl.innerHTML = `<li class="empty">${query ? '一致するピン留めメモがありません。' : 'ピン留めメモはありません。'}</li>`;
   } else {
-    pinned.forEach((n) => pinnedListEl.appendChild(buildNoteRow(n)));
+    pinnedSource.forEach((n) => pinnedListEl.appendChild(buildNoteRow(n, query)));
   }
 
+  const allSource = matchesQuery ? notes.filter(matchesQuery) : notes;
   allNotesListEl.innerHTML = '';
-  if (notes.length === 0) {
-    allNotesListEl.innerHTML = '<li class="empty">メモがありません。</li>';
+  if (allSource.length === 0) {
+    allNotesListEl.innerHTML = `<li class="empty">${query ? '一致するメモがありません。' : 'メモがありません。'}</li>`;
   } else {
-    notes.forEach((n) => allNotesListEl.appendChild(buildNoteRow(n)));
+    allSource.forEach((n) => allNotesListEl.appendChild(buildNoteRow(n, query)));
   }
+}
+
+// ひらがな/カタカナを同一視して検索できるよう、カタカナをひらがなへ正規化する（文字数は変わらないので
+// インデックスがそのまま元の文字列にも対応する）
+function toHiragana(str) {
+  return str.replace(/[ァ-ヶ]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0x60));
+}
+
+function buildNoteMatcher(query) {
+  const normalizedQuery = toHiragana(query.toLowerCase());
+  return (note) => {
+    const titleHit = toHiragana(note.title.toLowerCase()).includes(normalizedQuery);
+    if (titleHit) return true;
+    return toHiragana((note.body || '').toLowerCase()).includes(normalizedQuery);
+  };
+}
+
+// 本文ヒット箇所の前後20文字程度を抜粋する（PC版のbuildExcerpt()の簡易版。ハイライトはせずテキストのみ）
+function buildMobileExcerpt(body, query) {
+  if (!body || !query) return '';
+  const normalizedBody = toHiragana(body.toLowerCase());
+  const normalizedQuery = toHiragana(query.toLowerCase());
+  const idx = normalizedBody.indexOf(normalizedQuery);
+  if (idx === -1) return '';
+  const start = Math.max(0, idx - 20);
+  const end = Math.min(body.length, idx + query.length + 20);
+  let excerpt = body.slice(start, end).replace(/\s+/g, ' ').trim();
+  if (start > 0) excerpt = `…${excerpt}`;
+  if (end < body.length) excerpt = `${excerpt}…`;
+  return escapeHtml(excerpt);
 }
 
 function buildHomeTodoRow(todo) {
@@ -1470,12 +1555,22 @@ async function deleteTodoMobile(todo) {
   if (noteLinks.length !== linkedBefore) await writeNoteLinks();
 }
 
-function buildNoteRow(note) {
+function buildNoteRow(note, query) {
   const li = document.createElement('li');
   li.className = 'note-row';
   const cat = getCategory(note.category);
   const dotHtml = cat ? `<span class="dot" style="background:${cat.color}"></span>` : '';
-  li.innerHTML = `${dotHtml}<span class="note-title">${escapeHtml(note.title)}</span>`;
+
+  let excerptHtml = '';
+  if (query) {
+    const titleHit = toHiragana(note.title.toLowerCase()).includes(toHiragana(query.toLowerCase()));
+    if (!titleHit) {
+      const excerpt = buildMobileExcerpt(note.body || '', query);
+      if (excerpt) excerptHtml = `<span class="note-excerpt">${excerpt}</span>`;
+    }
+  }
+
+  li.innerHTML = `<div class="note-row-main">${dotHtml}<span class="note-title">${escapeHtml(note.title)}</span></div>${excerptHtml}`;
   li.addEventListener('click', () => openNote(note.path));
   return li;
 }
@@ -1548,6 +1643,11 @@ async function toggleTodo(todo, checked) {
   await writeTodos();
 }
 
+homeSearchInputEl.addEventListener('input', () => {
+  homeSearchQuery = homeSearchInputEl.value;
+  renderHome();
+});
+
 todoAddForm.addEventListener('submit', async (e) => {
   e.preventDefault();
   const text = todoInputEl.value.trim();
@@ -1563,6 +1663,8 @@ todoAddForm.addEventListener('submit', async (e) => {
   });
   todoInputEl.value = '';
   renderHome();
+  // 連続追加できるよう、追加後もフォーカスを維持する（iOS Safari対策でsubmitハンドラ内で同期的に呼ぶ）
+  todoInputEl.focus();
   await writeTodos();
 });
 
@@ -1968,6 +2070,58 @@ navLinkBtn.addEventListener('click', () => showView('link'));
 noteBackBtn.addEventListener('click', () => showView('home'));
 
 refreshBtn.addEventListener('click', () => loadAll());
+
+// ---- 引っ張って更新（プルリフレッシュ、指示メモ11） ----
+// ホーム表示中、スクロール最上部からさらに下へ引っ張ったらloadAll()を実行する。
+// ライブラリは使わずtouchstart/touchmove/touchendの素朴な実装にとどめている
+
+const PULL_REFRESH_THRESHOLD = 80;
+let pullStartY = null;
+let pullReady = false;
+
+viewHome.addEventListener(
+  'touchstart',
+  (e) => {
+    if (viewHome.scrollTop > 0) {
+      pullStartY = null;
+      return;
+    }
+    pullStartY = e.touches[0].clientY;
+    pullReady = false;
+  },
+  { passive: true }
+);
+
+viewHome.addEventListener(
+  'touchmove',
+  (e) => {
+    if (pullStartY === null) return;
+    const diff = e.touches[0].clientY - pullStartY;
+    if (diff <= 0) {
+      pullRefreshIndicatorEl.style.height = '0px';
+      return;
+    }
+    const distance = Math.min(diff, 120);
+    pullRefreshIndicatorEl.style.height = `${distance}px`;
+    pullReady = distance >= PULL_REFRESH_THRESHOLD;
+    pullRefreshIndicatorEl.textContent = pullReady ? '離して更新' : '↓ 引っ張って更新';
+  },
+  { passive: true }
+);
+
+viewHome.addEventListener('touchend', async () => {
+  if (pullStartY === null) return;
+  const shouldRefresh = pullReady;
+  pullStartY = null;
+  pullReady = false;
+  if (shouldRefresh) {
+    pullRefreshIndicatorEl.textContent = '更新中...';
+    pullRefreshIndicatorEl.style.height = '40px';
+    await loadAll();
+  }
+  pullRefreshIndicatorEl.style.height = '0px';
+  pullRefreshIndicatorEl.textContent = '↓ 引っ張って更新';
+});
 
 // ---- ライト/ダーク表示切替 ----
 
