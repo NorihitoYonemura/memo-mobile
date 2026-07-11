@@ -1079,18 +1079,22 @@ async function fetchFileViaContents(path) {
 
 function parseNote(content, fallbackTitle) {
   const m = content.match(/^---\s*\n([\s\S]*?)\n---\s*\n?([\s\S]*)$/);
-  if (!m) return { title: fallbackTitle, category: '', pinned: false, archived: false, body: content };
+  if (!m) return { title: fallbackTitle, created: '', updated: '', category: '', pinned: false, archived: false, body: content };
   const fm = m[1];
   const body = m[2].replace(/^\n+/, '');
   const titleLine = fm.split('\n').find((l) => l.trim().startsWith('title:'));
+  const createdLine = fm.split('\n').find((l) => l.trim().startsWith('created:'));
+  const updatedLine = fm.split('\n').find((l) => l.trim().startsWith('updated:'));
   const categoryLine = fm.split('\n').find((l) => l.trim().startsWith('category:'));
   const pinnedLine = fm.split('\n').find((l) => l.trim().startsWith('pinned:'));
   const archivedLine = fm.split('\n').find((l) => l.trim().startsWith('archived:'));
   const title = titleLine ? titleLine.split('title:')[1].trim().replace(/^['"]|['"]$/g, '') : fallbackTitle;
+  const created = createdLine ? createdLine.split('created:')[1].trim() : '';
+  const updated = updatedLine ? updatedLine.split('updated:')[1].trim() : '';
   const category = categoryLine ? categoryLine.split('category:')[1].trim().replace(/^['"]|['"]$/g, '') : '';
   const pinned = pinnedLine ? pinnedLine.split('pinned:')[1].trim() === 'true' : false;
   const archived = archivedLine ? archivedLine.split('archived:')[1].trim() === 'true' : false;
-  return { title, category, pinned, archived, body };
+  return { title, created, updated, category, pinned, archived, body };
 }
 
 function getCategory(id) {
@@ -1176,8 +1180,13 @@ async function loadAll() {
     );
     // アーカイブ済み（PC版で🗄アーカイブに入れたもの）はスマホの一覧にも出さない
     notes = allNotes.filter((n) => !n.archived);
+    // 改善対応表（2026-07-11）: 更新が入ったメモが上に来るように並び替え。
+    // updated（無ければcreated）が新しい順。どちらも無い古いメモはタイトル順で末尾に回す
     notes.sort((a, b) => {
       if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
+      const aTime = a.updated || a.created || '';
+      const bTime = b.updated || b.created || '';
+      if (aTime !== bTime) return bTime > aTime ? 1 : -1;
       return a.title.localeCompare(b.title, 'ja');
     });
 
@@ -1976,11 +1985,12 @@ function todayDateStr() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-function serializeNote({ title, created, category, pinned, archived, body }) {
+function serializeNote({ title, created, updated, category, pinned, archived, body }) {
+  const updatedLine = updated ? `\nupdated: ${updated}` : '';
   const categoryLine = category ? `\ncategory: ${category}` : '';
   const pinnedLine = pinned ? `\npinned: true` : '';
   const archivedLine = archived ? `\narchived: true` : '';
-  return `---\ntitle: ${title || 'untitled'}\ncreated: ${created || new Date().toISOString()}${categoryLine}${pinnedLine}${archivedLine}\n---\n\n${body || ''}`;
+  return `---\ntitle: ${title || 'untitled'}\ncreated: ${created || new Date().toISOString()}${updatedLine}${categoryLine}${pinnedLine}${archivedLine}\n---\n\n${body || ''}`;
 }
 
 function renderQuickView() {
@@ -1997,7 +2007,18 @@ async function saveDailyNote() {
   const dateStr = todayDateStr();
   dailyNotePath = `${dateStr}.md`;
   const bodyText = quickInputEl.value;
-  const content = serializeNote({ title: dateStr, created: new Date().toISOString(), category: '', pinned: false, archived: false, body: bodyText });
+  const existing = notes.find((n) => n.path === dailyNotePath);
+  // 既存メモがあれば元のcreatedを引き継ぐ（毎回上書きすると作成日時が保存のたびにズレてしまうバグがあったため修正）
+  const createdAt = (existing && existing.created) || new Date().toISOString();
+  const content = serializeNote({
+    title: dateStr,
+    created: createdAt,
+    updated: new Date().toISOString(),
+    category: '',
+    pinned: false,
+    archived: false,
+    body: bodyText,
+  });
   quickSaveStatusEl.textContent = '保存中...';
   try {
     const payload = {
@@ -2122,6 +2143,47 @@ viewHome.addEventListener('touchend', async () => {
   pullRefreshIndicatorEl.style.height = '0px';
   pullRefreshIndicatorEl.textContent = '↓ 引っ張って更新';
 });
+
+// ---- スワイプで戻る（改善対応表より、2026-07-11） ----
+// メモ詳細画面（view-note）の左端付近からのスワイプ操作でホームへ戻れるようにする。
+// ホーム/カレンダー/やることリスト/紐づけはタブ切替（階層構造なし）のため対象外、
+// 「詳細に入って戻る」操作があるメモ詳細だけが対象
+
+const SWIPE_BACK_EDGE_PX = 40;
+const SWIPE_BACK_THRESHOLD_PX = 80;
+let swipeBackStartX = null;
+let swipeBackStartY = null;
+
+viewNote.addEventListener(
+  'touchstart',
+  (e) => {
+    const x = e.touches[0].clientX;
+    if (x > SWIPE_BACK_EDGE_PX) {
+      swipeBackStartX = null;
+      return;
+    }
+    swipeBackStartX = x;
+    swipeBackStartY = e.touches[0].clientY;
+  },
+  { passive: true }
+);
+
+viewNote.addEventListener(
+  'touchend',
+  (e) => {
+    if (swipeBackStartX === null) return;
+    const endX = e.changedTouches[0].clientX;
+    const endY = e.changedTouches[0].clientY;
+    const dx = endX - swipeBackStartX;
+    const dy = Math.abs(endY - swipeBackStartY);
+    swipeBackStartX = null;
+    // 横方向に十分動き、縦方向のブレが小さい（スクロール操作と誤認しない）場合だけ戻る
+    if (dx >= SWIPE_BACK_THRESHOLD_PX && dy < 60) {
+      showView('home');
+    }
+  },
+  { passive: true }
+);
 
 // ---- ライト/ダーク表示切替 ----
 
