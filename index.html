@@ -509,6 +509,61 @@
     line-height: 1.1;
     text-align: center;
   }
+  .cal-day-dots {
+    display: flex;
+    gap: 3px;
+  }
+  .cal-day-event-dot {
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: #f2a93b;
+  }
+  .cal-day-section-label {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-weight: 600;
+    margin: 12px 0 4px;
+  }
+  .cal-day-event-form {
+    flex-wrap: wrap;
+  }
+  .cal-day-event-form input[type="time"],
+  .cal-day-event-form select {
+    flex: 1;
+    padding: 9px 8px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-main);
+    font-size: 12px;
+    outline: none;
+  }
+  .event-item {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+  }
+  .event-recur-badge { font-size: 11px; flex-shrink: 0; }
+  .event-time { font-size: 11px; color: var(--text-muted); flex-shrink: 0; }
+  .event-edit-form {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    flex-basis: 100%;
+  }
+  .event-edit-form input,
+  .event-edit-form select {
+    padding: 7px 8px;
+    border-radius: 7px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-main);
+    font-size: 13px;
+  }
+  .event-edit-actions { display: flex; gap: 8px; }
   .cal-day-dot {
     width: 4px;
     height: 4px;
@@ -912,6 +967,7 @@
       <div id="cal-grid" class="cal-grid"></div>
       <div id="cal-day-detail" class="cal-day-detail" hidden>
         <p id="cal-day-detail-label" class="cal-day-detail-label"></p>
+        <p class="cal-day-section-label">やること</p>
         <ul id="cal-day-todo-list" class="plain-list"></ul>
         <form id="cal-day-new-form" class="cal-day-new-form">
           <input id="cal-day-new-input" type="text" placeholder="この日にやることを追加..." />
@@ -920,6 +976,19 @@
         <select id="cal-day-add-select">
           <option value="">＋ 既存のやりたいことを追加...</option>
         </select>
+        <p class="cal-day-section-label">予定（繰り返しも可）</p>
+        <ul id="cal-day-event-list" class="plain-list"></ul>
+        <form id="cal-day-event-form" class="cal-day-new-form cal-day-event-form">
+          <input id="cal-day-event-input" type="text" placeholder="予定の内容..." />
+          <input id="cal-day-event-time-input" type="time" />
+          <select id="cal-day-event-recurrence-select">
+            <option value="">繰り返しなし</option>
+            <option value="weekly">毎週</option>
+            <option value="biweekly">隔週</option>
+            <option value="monthly">毎月</option>
+          </select>
+          <button type="submit">追加</button>
+        </form>
       </div>
     </main>
 
@@ -993,6 +1062,9 @@ const MEAL_SLOTS = [
   { key: 'lunch', label: '昼' },
   { key: 'dinner', label: '晩' },
 ];
+// 改善.md1番続き: やることを介さない軽量な予定（イベント）。PC版と同じ .events.json を共有
+const EVENTS_FILE = '.events.json';
+const EVENT_RECURRENCE_LABELS = { weekly: '毎週', biweekly: '隔週', monthly: '毎月' };
 
 let config = null;
 let categories = [];
@@ -1002,6 +1074,8 @@ let noteLinks = []; // [{ note: path, todoId }] メモ⇔やりたいことの�
 let noteLinksSha = null;
 let meals = [];
 let mealsSha = null;
+let events = [];
+let eventsSha = null;
 let notes = [];
 let treeByPath = new Map();
 let linkActiveTab = 'todo';
@@ -1077,6 +1151,11 @@ const calDayTodoListEl = document.getElementById('cal-day-todo-list');
 const calDayAddSelectEl = document.getElementById('cal-day-add-select');
 const calDayNewForm = document.getElementById('cal-day-new-form');
 const calDayNewInput = document.getElementById('cal-day-new-input');
+const calDayEventListEl = document.getElementById('cal-day-event-list');
+const calDayEventForm = document.getElementById('cal-day-event-form');
+const calDayEventInputEl = document.getElementById('cal-day-event-input');
+const calDayEventTimeInputEl = document.getElementById('cal-day-event-time-input');
+const calDayEventRecurrenceSelectEl = document.getElementById('cal-day-event-recurrence-select');
 
 const navLinkBtn = document.getElementById('nav-link-btn');
 const viewLink = document.getElementById('view-link');
@@ -1286,6 +1365,21 @@ async function loadAll() {
       mealsSha = viaContentsMeals ? viaContentsMeals.sha : entry.sha;
     }
 
+    events = [];
+    eventsSha = null;
+    if (treeByPath.has(EVENTS_FILE)) {
+      const entry = treeByPath.get(EVENTS_FILE);
+      const bytes = await fetchBlob(entry.sha);
+      try {
+        events = JSON.parse(bytesToUtf8(bytes));
+        if (!Array.isArray(events)) events = [];
+      } catch (e) {
+        events = [];
+      }
+      const viaContentsEvents = await fetchFileViaContents(EVENTS_FILE);
+      eventsSha = viaContentsEvents ? viaContentsEvents.sha : entry.sha;
+    }
+
     let briefingText = null;
     if (treeByPath.has(BRIEFING_PATH)) {
       const bytes = await fetchBlob(treeByPath.get(BRIEFING_PATH).sha);
@@ -1445,11 +1539,19 @@ function renderCalendarView() {
       h.textContent = holidayName;
       cell.appendChild(h);
     }
+    const dotsWrap = document.createElement('span');
+    dotsWrap.className = 'cal-day-dots';
     if (todosByDate.has(key)) {
       const dot = document.createElement('span');
       dot.className = 'cal-day-dot';
-      cell.appendChild(dot);
+      dotsWrap.appendChild(dot);
     }
+    if (events.some((ev) => eventOccursOnDate(ev, cellDate, key))) {
+      const edot = document.createElement('span');
+      edot.className = 'cal-day-event-dot';
+      dotsWrap.appendChild(edot);
+    }
+    if (dotsWrap.childElementCount) cell.appendChild(dotsWrap);
 
     cell.addEventListener('click', () => {
       selectedDayKey = key;
@@ -1496,7 +1598,7 @@ function renderDayDetail() {
   }
 
   // 未予定のやりたいことをこの日に追加できるセレクトを作る
-  calDayAddSelectEl.innerHTML = '<option value="">＋ 未予定のやりたいことを追加...</option>';
+  calDayAddSelectEl.innerHTML = '<option value="">＋ 既存のやりたいことを追加...</option>';
   todos
     .filter((t) => !t.scheduledDate)
     .forEach((t) => {
@@ -1505,6 +1607,16 @@ function renderDayDetail() {
       opt.textContent = t.text;
       calDayAddSelectEl.appendChild(opt);
     });
+
+  const [yy, mm, dd] = selectedDayKey.split('-').map(Number);
+  const selectedDate = new Date(yy, mm - 1, dd);
+  const dayEvents = events.filter((ev) => eventOccursOnDate(ev, selectedDate, selectedDayKey));
+  calDayEventListEl.innerHTML = '';
+  if (dayEvents.length === 0) {
+    calDayEventListEl.innerHTML = '<li class="empty">この日の予定はありません。</li>';
+  } else {
+    dayEvents.forEach((ev) => calDayEventListEl.appendChild(buildEventItem(ev)));
+  }
 }
 
 calDayAddSelectEl.addEventListener('change', async () => {
@@ -1540,6 +1652,30 @@ calDayNewForm.addEventListener('submit', async (e) => {
   renderCalendarView();
   renderHome();
   await writeTodos();
+});
+
+// カレンダーの日付から直接、軽量な予定（イベント）を新規登録する（繰り返し設定も可）
+calDayEventForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const text = calDayEventInputEl.value.trim();
+  if (!text || !selectedDayKey) return;
+  const now = new Date().toISOString();
+  events.push({
+    id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    text,
+    date: selectedDayKey,
+    time: calDayEventTimeInputEl.value || null,
+    recurrence: calDayEventRecurrenceSelectEl.value || null,
+    untilDate: null,
+    created: now,
+    updated: now,
+  });
+  calDayEventInputEl.value = '';
+  calDayEventTimeInputEl.value = '';
+  calDayEventRecurrenceSelectEl.value = '';
+  renderDayDetail();
+  renderCalendarView();
+  await writeEvents();
 });
 
 calPrevBtn.addEventListener('click', () => {
@@ -2173,6 +2309,178 @@ function renderMeals() {
   MEAL_SLOTS.forEach(({ key, label }) => {
     mealsListEl.appendChild(buildMealSlot(todayStr, key, label));
   });
+}
+
+// ---- カレンダーの軽量イベント（.events.json。改善.md1番続き。PC版と共有するデータ形式） ----
+// 「やりたいこと」を介さずカレンダーの日付に直接登録できる軽い予定。繰り返し（毎週/隔週/毎月）にも対応。
+// 繰り返しの各回は個別レコード化せず、起点日＋recurrenceルールとして保持し、表示のたびに occurrence を計算する。
+// 編集・削除は常にシリーズ全体が対象（個人用の軽量実装としての割り切り。PC版と同じ方針）。
+
+function eventOccursOnDate(event, cellDate, cellKey) {
+  if (cellKey < event.date) return false;
+  if (event.untilDate && cellKey > event.untilDate) return false;
+  if (!event.recurrence) return cellKey === event.date;
+  const anchor = new Date(`${event.date}T00:00:00`);
+  if (event.recurrence === 'monthly') {
+    return cellDate.getDate() === anchor.getDate();
+  }
+  const diffDays = Math.round((cellDate - anchor) / 86400000);
+  if (event.recurrence === 'weekly') return diffDays % 7 === 0;
+  if (event.recurrence === 'biweekly') return diffDays % 14 === 0;
+  return false;
+}
+
+function mergeEvents(localList, remoteList) {
+  const localById = new Map(localList.map((ev) => [ev.id, ev]));
+  const remoteById = new Map(remoteList.map((ev) => [ev.id, ev]));
+  const mergedById = new Map();
+  localById.forEach((local, id) => {
+    const remote = remoteById.get(id);
+    if (!remote) { mergedById.set(id, local); return; }
+    const lu = local.updated || '';
+    const ru = remote.updated || '';
+    mergedById.set(id, ru > lu ? remote : local);
+  });
+  remoteById.forEach((remote, id) => {
+    if (!mergedById.has(id)) mergedById.set(id, remote);
+  });
+  return [...mergedById.values()];
+}
+
+// .events.json への書き込み。sha不一致（409/422）の場合はリモートを取得してマージし、1回だけ再試行する
+async function writeEvents() {
+  setStatus('保存中...');
+  try {
+    const body = {
+      message: 'mobile: update .events.json',
+      content: bytesToBase64(utf8ToBytes(JSON.stringify(events, null, 2))),
+      branch: config.branch,
+    };
+    if (eventsSha) body.sha = eventsSha;
+
+    let res = await ghFetch(`/contents/${encodeApiPath(EVENTS_FILE)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+
+    if ((res.status === 409 || res.status === 422) && eventsSha) {
+      const latest = await fetchFileViaContents(EVENTS_FILE);
+      if (latest) {
+        let remoteEvents = [];
+        try {
+          remoteEvents = JSON.parse(bytesToUtf8(latest.bytes));
+        } catch (e) {
+          remoteEvents = [];
+        }
+        events = mergeEvents(events, remoteEvents);
+        renderCalendarView();
+        renderDayDetail();
+        const retryBody = {
+          ...body,
+          sha: latest.sha,
+          content: bytesToBase64(utf8ToBytes(JSON.stringify(events, null, 2))),
+        };
+        res = await ghFetch(`/contents/${encodeApiPath(EVENTS_FILE)}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(retryBody),
+        });
+      }
+    }
+
+    if (!res.ok) {
+      const errText = await res.text().catch(() => '');
+      throw new Error(`保存に失敗しました（${res.status}）${errText ? `: ${errText}` : ''}`);
+    }
+    const data = await res.json();
+    eventsSha = data.content.sha;
+    setStatus(null);
+  } catch (e) {
+    console.error(e);
+    setStatus(`保存に失敗しました。オフラインまたはトークンが失効している可能性があります。（${e.message || e}）`, true);
+  }
+}
+
+function buildEventItem(event) {
+  const li = document.createElement('li');
+  li.className = 'event-item';
+
+  function renderView() {
+    li.innerHTML = '';
+    li.className = 'event-item';
+    const recurHtml = event.recurrence ? `<span class="event-recur-badge" title="${EVENT_RECURRENCE_LABELS[event.recurrence]}">🔁</span>` : '';
+    const timeHtml = event.time ? `<span class="event-time">${event.time}</span>` : '';
+    li.innerHTML = `${timeHtml}${recurHtml}<span class="todo-text">${escapeHtml(event.text)}</span><button type="button" class="event-edit-btn">✏️</button><button type="button" class="event-delete-btn">🗑</button>`;
+    li.querySelector('.event-edit-btn').addEventListener('click', renderEdit);
+    li.querySelector('.event-delete-btn').addEventListener('click', async () => {
+      const msg = event.recurrence
+        ? `「${event.text}」（${EVENT_RECURRENCE_LABELS[event.recurrence]}の繰り返し予定）を削除しますか？すべての回が削除されます。`
+        : `「${event.text}」を削除しますか？`;
+      if (!confirm(msg)) return;
+      events = events.filter((ev) => ev.id !== event.id);
+      renderDayDetail();
+      renderCalendarView();
+      await writeEvents();
+    });
+  }
+
+  function renderEdit() {
+    li.innerHTML = '';
+    const form = document.createElement('div');
+    form.className = 'event-edit-form';
+
+    const textInput = document.createElement('input');
+    textInput.type = 'text';
+    textInput.value = event.text;
+
+    const timeInput = document.createElement('input');
+    timeInput.type = 'time';
+    timeInput.value = event.time || '';
+
+    const recurrenceSelect = document.createElement('select');
+    recurrenceSelect.innerHTML = `
+      <option value="">繰り返しなし</option>
+      <option value="weekly">毎週</option>
+      <option value="biweekly">隔週</option>
+      <option value="monthly">毎月</option>
+    `;
+    recurrenceSelect.value = event.recurrence || '';
+
+    const actions = document.createElement('div');
+    actions.className = 'event-edit-actions';
+    const saveBtn = document.createElement('button');
+    saveBtn.type = 'button';
+    saveBtn.textContent = '保存';
+    const cancelBtn = document.createElement('button');
+    cancelBtn.type = 'button';
+    cancelBtn.textContent = 'キャンセル';
+    actions.appendChild(saveBtn);
+    actions.appendChild(cancelBtn);
+
+    form.appendChild(textInput);
+    form.appendChild(timeInput);
+    form.appendChild(recurrenceSelect);
+    form.appendChild(actions);
+    li.appendChild(form);
+    textInput.focus();
+
+    cancelBtn.addEventListener('click', renderView);
+    saveBtn.addEventListener('click', async () => {
+      const trimmed = textInput.value.trim();
+      if (!trimmed) return;
+      event.text = trimmed;
+      event.time = timeInput.value || null;
+      event.recurrence = recurrenceSelect.value || null;
+      event.updated = new Date().toISOString();
+      renderView();
+      renderCalendarView();
+      await writeEvents();
+    });
+  }
+
+  renderView();
+  return li;
 }
 
 // ---- メモ⇔やりたいことの紐づけ（.note-links.json。PC版と共有するデータ形式） ----
