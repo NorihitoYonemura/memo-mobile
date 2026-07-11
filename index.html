@@ -585,7 +585,6 @@
 
     <nav class="tab-nav">
       <button id="nav-home-btn" class="active" data-view="home">🏠 ホーム</button>
-      <button id="nav-todos-btn" data-view="todos">✅ やりたいこと</button>
       <button id="nav-calendar-btn" data-view="calendar">🗓 予定</button>
       <button id="nav-quick-btn" data-view="quick">📅 デイリー</button>
       <button id="nav-link-btn" data-view="link">🔗 紐づけ</button>
@@ -596,6 +595,10 @@
 
       <section class="card">
         <h2>やること</h2>
+        <form id="todo-add-form">
+          <input id="todo-input" type="text" placeholder="やりたいことを入力..." />
+          <button type="submit">追加</button>
+        </form>
         <ul id="home-todo-list" class="plain-list"></ul>
       </section>
 
@@ -619,14 +622,6 @@
       <button id="note-back-btn" class="back-btn">← ホーム</button>
       <p id="note-title-label"></p>
       <div id="note-preview" class="note-preview"></div>
-    </main>
-
-    <main id="view-todos" class="view" hidden>
-      <form id="todo-add-form">
-        <input id="todo-input" type="text" placeholder="やりたいことを入力..." />
-        <button type="submit">追加</button>
-      </form>
-      <ul id="todos-view-list" class="plain-list"></ul>
     </main>
 
     <main id="view-calendar" class="view" hidden>
@@ -746,7 +741,6 @@ const themeToggleBtn = document.getElementById('theme-toggle-btn');
 
 const viewHome = document.getElementById('view-home');
 const viewNote = document.getElementById('view-note');
-const viewTodos = document.getElementById('view-todos');
 const viewQuick = document.getElementById('view-quick');
 const viewSettings = document.getElementById('view-settings');
 
@@ -763,7 +757,6 @@ const notePreviewEl = document.getElementById('note-preview');
 
 const todoAddForm = document.getElementById('todo-add-form');
 const todoInputEl = document.getElementById('todo-input');
-const todosViewListEl = document.getElementById('todos-view-list');
 
 const quickDateLabelEl = document.getElementById('quick-date-label');
 const quickInputEl = document.getElementById('quick-input');
@@ -777,7 +770,6 @@ const settingsTokenInput = document.getElementById('settings-token-input');
 const settingsCancelBtn = document.getElementById('settings-cancel-btn');
 
 const navHomeBtn = document.getElementById('nav-home-btn');
-const navTodosBtn = document.getElementById('nav-todos-btn');
 const navCalendarBtn = document.getElementById('nav-calendar-btn');
 const navQuickBtn = document.getElementById('nav-quick-btn');
 
@@ -1244,12 +1236,11 @@ calNextBtn.addEventListener('click', () => {
 function renderHome() {
   todayLabelEl.textContent = formatToday(new Date());
 
-  const incomplete = todos.filter((t) => !t.done).slice(0, 5);
   homeTodoListEl.innerHTML = '';
-  if (incomplete.length === 0) {
-    homeTodoListEl.innerHTML = '<li class="empty">今日のやることはありません🎉</li>';
+  if (todos.length === 0) {
+    homeTodoListEl.innerHTML = '<li class="empty">まだ何もありません。上のフォームから追加しましょう。</li>';
   } else {
-    incomplete.forEach((t) => homeTodoListEl.appendChild(buildHomeTodoRow(t)));
+    todos.forEach((t) => homeTodoListEl.appendChild(buildHomeTodoRow(t)));
   }
 
   const pinned = notes.filter((n) => n.pinned);
@@ -1357,28 +1348,11 @@ notePreviewEl.addEventListener('click', (e) => {
   }
 });
 
-// ---- やりたいこと（唯一の書き込み処理） ----
-
-function renderTodosView() {
-  todosViewListEl.innerHTML = '';
-  if (todos.length === 0) {
-    todosViewListEl.innerHTML = '<li class="empty">まだ何もありません。上のフォームから追加しましょう。</li>';
-    return;
-  }
-  todos.forEach((todo) => {
-    const li = document.createElement('li');
-    li.className = `todo-item${todo.done ? ' done' : ''}`;
-    const priorityHtml = todo.priority === 'high' ? '<span class="priority">❗</span>' : '';
-    li.innerHTML = `<input type="checkbox" ${todo.done ? 'checked' : ''} />${priorityHtml}<span class="todo-text">${escapeHtml(todo.text)}</span>`;
-    li.querySelector('input').addEventListener('change', (e) => toggleTodo(todo, e.target.checked));
-    todosViewListEl.appendChild(li);
-  });
-}
+// ---- やりたいこと（唯一の書き込み処理。ホームの「やること」カードに統合） ----
 
 async function toggleTodo(todo, checked) {
   todo.done = checked;
   todo.updated = new Date().toISOString();
-  renderTodosView();
   renderHome();
   await writeTodos();
 }
@@ -1397,7 +1371,6 @@ todoAddForm.addEventListener('submit', async (e) => {
     priority: 'normal',
   });
   todoInputEl.value = '';
-  renderTodosView();
   renderHome();
   await writeTodos();
 });
@@ -1463,7 +1436,6 @@ async function writeTodos() {
           remoteTodos = [];
         }
         todos = mergeTodos(todos, remoteTodos);
-        renderTodosView();
         renderHome();
         const retryBody = {
           ...body,
@@ -1785,24 +1757,20 @@ quickSaveBtn.addEventListener('click', saveDailyNote);
 function showView(view) {
   viewHome.hidden = view !== 'home';
   viewNote.hidden = view !== 'note';
-  viewTodos.hidden = view !== 'todos';
   viewCalendar.hidden = view !== 'calendar';
   viewQuick.hidden = view !== 'quick';
   viewLink.hidden = view !== 'link';
   viewSettings.hidden = view !== 'settings';
   navHomeBtn.classList.toggle('active', view === 'home');
-  navTodosBtn.classList.toggle('active', view === 'todos');
   navCalendarBtn.classList.toggle('active', view === 'calendar');
   navQuickBtn.classList.toggle('active', view === 'quick');
   navLinkBtn.classList.toggle('active', view === 'link');
-  if (view === 'todos') renderTodosView();
   if (view === 'calendar') { renderCalendarView(); renderDayDetail(); }
   if (view === 'quick') renderQuickView();
   if (view === 'link') renderLinkView();
 }
 
 navHomeBtn.addEventListener('click', () => showView('home'));
-navTodosBtn.addEventListener('click', () => showView('todos'));
 navCalendarBtn.addEventListener('click', () => showView('calendar'));
 navQuickBtn.addEventListener('click', () => showView('quick'));
 navLinkBtn.addEventListener('click', () => showView('link'));
