@@ -1,0 +1,1001 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+<title>memo (mobile)</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
+<style>
+  :root {
+    --bg-main: #1c1e26;
+    --bg-panel: #22242e;
+    --text-main: #e7e8ee;
+    --text-muted: #9a9dab;
+    --border: #33353f;
+    --accent: #7c6cf0;
+    --accent-hover: #8f81f5;
+    --danger: #e0555a;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    height: 100%;
+    background: var(--bg-main);
+    color: var(--text-main);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans", "Yu Gothic", sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  [hidden] { display: none !important; }
+  button, input {
+    font-family: inherit;
+  }
+  a { color: var(--accent); }
+
+  /* ---- 初回設定 / 設定画面 ---- */
+  .setup-screen {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+  .setup-box {
+    width: 100%;
+    max-width: 380px;
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 28px 24px;
+  }
+  .setup-box h1 {
+    margin: 0 0 6px;
+    font-size: 19px;
+  }
+  .setup-box p.hint {
+    color: var(--text-muted);
+    font-size: 12.5px;
+    line-height: 1.7;
+    margin: 0 0 18px;
+  }
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-bottom: 14px;
+    font-size: 12.5px;
+    color: var(--text-muted);
+  }
+  .field input {
+    padding: 10px 12px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-main);
+    font-size: 14px;
+    outline: none;
+  }
+  .field input:focus {
+    border-color: var(--accent);
+  }
+  .setup-error {
+    color: var(--danger);
+    font-size: 12.5px;
+    min-height: 16px;
+    margin-bottom: 6px;
+  }
+  .primary-btn {
+    width: 100%;
+    padding: 11px;
+    border-radius: 8px;
+    border: none;
+    background: var(--accent);
+    color: #fff;
+    font-size: 14.5px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .primary-btn:hover { background: var(--accent-hover); }
+  .secondary-btn {
+    width: 100%;
+    padding: 10px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-main);
+    font-size: 13.5px;
+    cursor: pointer;
+    margin-top: 8px;
+  }
+
+  /* ---- アプリ全体 ---- */
+  .app {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+  }
+  header.top-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-panel);
+    position: sticky;
+    top: 0;
+    z-index: 5;
+  }
+  header.top-bar h1 {
+    font-size: 15px;
+    margin: 0;
+    font-weight: 700;
+  }
+  .top-bar-actions { display: flex; gap: 6px; }
+  .icon-btn {
+    width: 34px;
+    height: 34px;
+    border-radius: 8px;
+    border: none;
+    background: transparent;
+    color: var(--text-main);
+    font-size: 16px;
+    cursor: pointer;
+  }
+  .icon-btn:active { background: var(--border); }
+
+  #status-banner {
+    padding: 8px 16px;
+    font-size: 12.5px;
+    color: var(--text-muted);
+    background: var(--bg-panel);
+    border-bottom: 1px solid var(--border);
+  }
+  #status-banner.error { color: var(--danger); }
+
+  main.view {
+    flex: 1;
+    padding: 16px;
+    overflow-y: auto;
+  }
+
+  .card {
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 16px;
+    margin-bottom: 14px;
+  }
+  .card h2 {
+    font-size: 13px;
+    margin: 0 0 10px;
+    color: var(--text-main);
+  }
+  .today-label {
+    font-size: 17px;
+    font-weight: 700;
+    margin: 0 0 14px;
+  }
+
+  ul.plain-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  li.empty {
+    color: var(--text-muted);
+    font-size: 13px;
+  }
+  li.todo-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+  }
+  li.todo-item.done span.todo-text { color: var(--text-muted); text-decoration: line-through; }
+  li.todo-item input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    accent-color: var(--accent);
+    flex-shrink: 0;
+  }
+  .priority { color: var(--danger); flex-shrink: 0; }
+
+  li.note-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 8px;
+    border-radius: 8px;
+    cursor: pointer;
+  }
+  li.note-row:active { background: var(--border); }
+  .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .note-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  #todo-add-form {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+  #todo-add-form input {
+    flex: 1;
+    padding: 10px 12px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-main);
+    font-size: 14px;
+    outline: none;
+  }
+  #todo-add-form button {
+    padding: 10px 16px;
+    border-radius: 8px;
+    border: none;
+    background: var(--accent);
+    color: #fff;
+    font-size: 14px;
+    cursor: pointer;
+  }
+
+  /* ---- メモ閲覧 ---- */
+  #note-title-label {
+    font-size: 18px;
+    font-weight: 700;
+    margin: 0 0 14px;
+  }
+  .note-preview {
+    line-height: 1.85;
+    font-size: 15px;
+  }
+  .note-preview h1, .note-preview h2, .note-preview h3 {
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 6px;
+  }
+  .note-preview code {
+    background: var(--border);
+    padding: 2px 5px;
+    border-radius: 5px;
+    font-size: 0.9em;
+  }
+  .note-preview pre code {
+    display: block;
+    padding: 12px;
+    overflow-x: auto;
+    background: #0d0e12;
+    border-radius: 8px;
+  }
+  .note-preview img { max-width: 100%; border-radius: 8px; }
+  .wiki-link { text-decoration: underline dotted; cursor: pointer; }
+  .back-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-main);
+    border-radius: 8px;
+    padding: 7px 12px;
+    font-size: 13px;
+    cursor: pointer;
+    margin-bottom: 14px;
+  }
+
+  nav.bottom-nav {
+    display: flex;
+    border-top: 1px solid var(--border);
+    background: var(--bg-panel);
+  }
+  nav.bottom-nav button {
+    flex: 1;
+    padding: 12px 0;
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 12.5px;
+    cursor: pointer;
+  }
+  nav.bottom-nav button.active { color: var(--accent); font-weight: 700; }
+</style>
+</head>
+<body>
+
+  <div id="setup-screen" class="setup-screen">
+    <div class="setup-box">
+      <h1>memo (mobile)</h1>
+      <p class="hint">
+        PC版で設定したGitHubのプライベートリポジトリに接続します。owner/repo・branch・トークンはPC版の「☁️ GitHub同期」設定と同じ値を入力してください。
+        トークンはこの端末のブラウザにのみ保存されます。
+      </p>
+      <p id="setup-error" class="setup-error"></p>
+      <form id="setup-form">
+        <div class="field">
+          <span>owner/repo</span>
+          <input id="setup-repo-input" type="text" placeholder="例: NorihitoYonemura/memo-data" />
+        </div>
+        <div class="field">
+          <span>branch</span>
+          <input id="setup-branch-input" type="text" placeholder="main" />
+        </div>
+        <div class="field">
+          <span>Personal Access Token</span>
+          <input id="setup-token-input" type="password" placeholder="github_pat_..." autocomplete="off" />
+        </div>
+        <button type="submit" class="primary-btn">接続する</button>
+      </form>
+    </div>
+  </div>
+
+  <div id="app" class="app" hidden>
+    <header class="top-bar">
+      <h1 id="header-title">memo</h1>
+      <div class="top-bar-actions">
+        <button id="refresh-btn" class="icon-btn" title="再読み込み">🔄</button>
+        <button id="settings-btn" class="icon-btn" title="接続設定">⚙️</button>
+      </div>
+    </header>
+    <div id="status-banner" hidden></div>
+
+    <main id="view-home" class="view">
+      <p id="today-label" class="today-label"></p>
+
+      <section class="card">
+        <h2>やること</h2>
+        <ul id="home-todo-list" class="plain-list"></ul>
+      </section>
+
+      <section id="briefing-card" class="card" hidden>
+        <h2>🤖 AIからのお知らせ</h2>
+        <div id="briefing-body" class="note-preview"></div>
+      </section>
+
+      <section class="card">
+        <h2>📌 ピン留め</h2>
+        <ul id="pinned-list" class="plain-list"></ul>
+      </section>
+
+      <section class="card">
+        <h2>すべてのメモ</h2>
+        <ul id="all-notes-list" class="plain-list"></ul>
+      </section>
+    </main>
+
+    <main id="view-note" class="view" hidden>
+      <button id="note-back-btn" class="back-btn">← ホーム</button>
+      <p id="note-title-label"></p>
+      <div id="note-preview" class="note-preview"></div>
+    </main>
+
+    <main id="view-todos" class="view" hidden>
+      <form id="todo-add-form">
+        <input id="todo-input" type="text" placeholder="やりたいことを入力..." />
+        <button type="submit">追加</button>
+      </form>
+      <ul id="todos-view-list" class="plain-list"></ul>
+    </main>
+
+    <main id="view-settings" class="view" hidden>
+      <p class="hint" style="color:var(--text-muted);font-size:12.5px;margin-bottom:14px;">接続設定を変更します。</p>
+      <form id="settings-form">
+        <div class="field">
+          <span>owner/repo</span>
+          <input id="settings-repo-input" type="text" />
+        </div>
+        <div class="field">
+          <span>branch</span>
+          <input id="settings-branch-input" type="text" />
+        </div>
+        <div class="field">
+          <span>Personal Access Token</span>
+          <input id="settings-token-input" type="password" autocomplete="off" />
+        </div>
+        <button type="submit" class="primary-btn">保存して再読み込み</button>
+      </form>
+      <button id="settings-cancel-btn" class="secondary-btn">キャンセル</button>
+    </main>
+
+    <nav class="bottom-nav">
+      <button id="nav-home-btn" class="active" data-view="home">🏠 ホーム</button>
+      <button id="nav-todos-btn" data-view="todos">✅ やりたいこと</button>
+    </nav>
+  </div>
+
+<script>
+'use strict';
+
+// memo (mobile) — GitHubのプライベートリポジトリをContents/Blobs APIで読み書きする単一ファイルのビューア。
+// PC版 public/ のコードとは共有していない（コード共有の仕組みが無いため重複はやむなし）。
+// メモ本文の編集はしない。書き込みは .todos.json のみ（唯一の書き込み処理）。
+
+const CONFIG_KEY = 'memo-mobile-github-sync';
+const TODOS_FILE = '.todos.json';
+const CATEGORIES_FILE = '.categories.json';
+const BRIEFING_PATH = '_ai/BRIEFING.md';
+
+let config = null;
+let categories = [];
+let todos = [];
+let todosSha = null;
+let notes = [];
+let treeByPath = new Map();
+
+// ---- DOM参照 ----
+const setupScreen = document.getElementById('setup-screen');
+const setupError = document.getElementById('setup-error');
+const setupForm = document.getElementById('setup-form');
+const setupRepoInput = document.getElementById('setup-repo-input');
+const setupBranchInput = document.getElementById('setup-branch-input');
+const setupTokenInput = document.getElementById('setup-token-input');
+
+const appEl = document.getElementById('app');
+const statusBanner = document.getElementById('status-banner');
+const refreshBtn = document.getElementById('refresh-btn');
+const settingsBtn = document.getElementById('settings-btn');
+
+const viewHome = document.getElementById('view-home');
+const viewNote = document.getElementById('view-note');
+const viewTodos = document.getElementById('view-todos');
+const viewSettings = document.getElementById('view-settings');
+
+const todayLabelEl = document.getElementById('today-label');
+const homeTodoListEl = document.getElementById('home-todo-list');
+const briefingCard = document.getElementById('briefing-card');
+const briefingBodyEl = document.getElementById('briefing-body');
+const pinnedListEl = document.getElementById('pinned-list');
+const allNotesListEl = document.getElementById('all-notes-list');
+
+const noteBackBtn = document.getElementById('note-back-btn');
+const noteTitleLabelEl = document.getElementById('note-title-label');
+const notePreviewEl = document.getElementById('note-preview');
+
+const todoAddForm = document.getElementById('todo-add-form');
+const todoInputEl = document.getElementById('todo-input');
+const todosViewListEl = document.getElementById('todos-view-list');
+
+const settingsForm = document.getElementById('settings-form');
+const settingsRepoInput = document.getElementById('settings-repo-input');
+const settingsBranchInput = document.getElementById('settings-branch-input');
+const settingsTokenInput = document.getElementById('settings-token-input');
+const settingsCancelBtn = document.getElementById('settings-cancel-btn');
+
+const navHomeBtn = document.getElementById('nav-home-btn');
+const navTodosBtn = document.getElementById('nav-todos-btn');
+
+// ---- 設定の読み書き（localStorageのみ。トークンをコードに埋め込まない） ----
+
+function loadConfig() {
+  try {
+    const raw = localStorage.getItem(CONFIG_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed.owner || !parsed.repo || !parsed.token) return null;
+    return { branch: 'main', ...parsed };
+  } catch (e) {
+    return null;
+  }
+}
+
+function saveConfig(cfg) {
+  localStorage.setItem(CONFIG_KEY, JSON.stringify(cfg));
+}
+
+// ---- base64 / bytes ユーティリティ（UTF-8対応。btoa/atob直呼びはNG） ----
+
+function bytesToBase64(bytes) {
+  let binary = '';
+  const chunkSize = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize));
+  }
+  return btoa(binary);
+}
+
+function base64ToBytes(b64) {
+  const binary = atob(b64.replace(/\n/g, ''));
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes;
+}
+
+function bytesToUtf8(bytes) {
+  return new TextDecoder().decode(bytes);
+}
+
+function utf8ToBytes(str) {
+  return new TextEncoder().encode(str);
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str == null ? '' : String(str);
+  return div.innerHTML;
+}
+
+function encodeApiPath(path) {
+  return path.split('/').map(encodeURIComponent).join('/');
+}
+
+// ---- GitHub REST API ----
+
+async function ghFetch(path, options = {}) {
+  const url = `https://api.github.com/repos/${config.owner}/${config.repo}${path}`;
+  return fetch(url, {
+    ...options,
+    headers: {
+      Authorization: `Bearer ${config.token}`,
+      Accept: 'application/vnd.github+json',
+      ...(options.headers || {}),
+    },
+  });
+}
+
+async function fetchTree() {
+  const res = await ghFetch(`/git/trees/${encodeURIComponent(config.branch)}?recursive=1`);
+  if (res.status === 404) return [];
+  if (!res.ok) throw new Error(`一覧の取得に失敗しました（${res.status}）`);
+  const data = await res.json();
+  return (data.tree || []).filter((e) => e.type === 'blob');
+}
+
+async function fetchBlob(sha) {
+  const res = await ghFetch(`/git/blobs/${sha}`);
+  if (!res.ok) throw new Error(`データ取得に失敗しました（${res.status}）`);
+  const data = await res.json();
+  return base64ToBytes(data.content);
+}
+
+// Contents APIでファイル取得（sha込み。書き込み前の最新sha取得に使用）
+async function fetchFileViaContents(path) {
+  const res = await ghFetch(`/contents/${encodeApiPath(path)}?ref=${encodeURIComponent(config.branch)}`);
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`${path} の取得に失敗しました（${res.status}）`);
+  const data = await res.json();
+  return { sha: data.sha, bytes: base64ToBytes(data.content) };
+}
+
+// ---- frontmatter付きメモの簡易パース（本文とtitle/category/pinnedのみ抽出。PC版parseNote相当の再実装） ----
+
+function parseNote(content, fallbackTitle) {
+  const m = content.match(/^---\s*\n([\s\S]*?)\n---\s*\n?([\s\S]*)$/);
+  if (!m) return { title: fallbackTitle, category: '', pinned: false, body: content };
+  const fm = m[1];
+  const body = m[2].replace(/^\n+/, '');
+  const titleLine = fm.split('\n').find((l) => l.trim().startsWith('title:'));
+  const categoryLine = fm.split('\n').find((l) => l.trim().startsWith('category:'));
+  const pinnedLine = fm.split('\n').find((l) => l.trim().startsWith('pinned:'));
+  const title = titleLine ? titleLine.split('title:')[1].trim().replace(/^['"]|['"]$/g, '') : fallbackTitle;
+  const category = categoryLine ? categoryLine.split('category:')[1].trim().replace(/^['"]|['"]$/g, '') : '';
+  const pinned = pinnedLine ? pinnedLine.split('pinned:')[1].trim() === 'true' : false;
+  return { title, category, pinned, body };
+}
+
+function getCategory(id) {
+  return categories.find((c) => c.id === id);
+}
+
+// ---- 読み込み中／エラー表示 ----
+
+function setStatus(text, isError) {
+  if (!text) {
+    statusBanner.hidden = true;
+    statusBanner.textContent = '';
+    statusBanner.classList.remove('error');
+    return;
+  }
+  statusBanner.hidden = false;
+  statusBanner.textContent = text;
+  statusBanner.classList.toggle('error', !!isError);
+}
+
+// ---- データ読み込み ----
+
+async function loadAll() {
+  setStatus('データを読み込み中...');
+  try {
+    const tree = await fetchTree();
+    treeByPath = new Map(tree.map((e) => [e.path, e]));
+
+    categories = [];
+    if (treeByPath.has(CATEGORIES_FILE)) {
+      const bytes = await fetchBlob(treeByPath.get(CATEGORIES_FILE).sha);
+      try {
+        categories = JSON.parse(bytesToUtf8(bytes));
+      } catch (e) {
+        categories = [];
+      }
+    }
+
+    todos = [];
+    todosSha = null;
+    if (treeByPath.has(TODOS_FILE)) {
+      const entry = treeByPath.get(TODOS_FILE);
+      const bytes = await fetchBlob(entry.sha);
+      try {
+        todos = JSON.parse(bytesToUtf8(bytes));
+      } catch (e) {
+        todos = [];
+      }
+      // 書き込み時のsha競合チェック用に、Contents API側のsha（blob shaと同値）も取得しておく
+      const viaContents = await fetchFileViaContents(TODOS_FILE);
+      todosSha = viaContents ? viaContents.sha : entry.sha;
+    }
+
+    let briefingText = null;
+    if (treeByPath.has(BRIEFING_PATH)) {
+      const bytes = await fetchBlob(treeByPath.get(BRIEFING_PATH).sha);
+      briefingText = bytesToUtf8(bytes);
+    }
+
+    const noteEntries = tree.filter((e) => e.path.endsWith('.md') && !e.path.includes('/'));
+    notes = await Promise.all(
+      noteEntries.map(async (e) => {
+        const bytes = await fetchBlob(e.sha);
+        const content = bytesToUtf8(bytes);
+        const parsed = parseNote(content, e.path.replace(/\.md$/, ''));
+        return { path: e.path, sha: e.sha, ...parsed };
+      })
+    );
+    notes.sort((a, b) => {
+      if (a.pinned !== b.pinned) return a.pinned ? -1 : 1;
+      return a.title.localeCompare(b.title, 'ja');
+    });
+
+    setStatus(null);
+    renderHome();
+    if (briefingText && briefingText.trim()) {
+      briefingCard.hidden = false;
+      briefingBodyEl.innerHTML = marked.parse(briefingText);
+    } else {
+      briefingCard.hidden = true;
+    }
+  } catch (e) {
+    console.error(e);
+    setStatus(`読み込みに失敗しました。オフラインまたはトークンが失効している可能性があります。（${e.message || e}）`, true);
+  }
+}
+
+// ---- ホーム ----
+
+const WEEKDAYS_JA = ['日', '月', '火', '水', '木', '金', '土'];
+
+function formatToday(date) {
+  return `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日（${WEEKDAYS_JA[date.getDay()]}）`;
+}
+
+function renderHome() {
+  todayLabelEl.textContent = formatToday(new Date());
+
+  const incomplete = todos.filter((t) => !t.done).slice(0, 5);
+  homeTodoListEl.innerHTML = '';
+  if (incomplete.length === 0) {
+    homeTodoListEl.innerHTML = '<li class="empty">今日のやることはありません🎉</li>';
+  } else {
+    incomplete.forEach((t) => homeTodoListEl.appendChild(buildHomeTodoRow(t)));
+  }
+
+  const pinned = notes.filter((n) => n.pinned);
+  pinnedListEl.innerHTML = '';
+  if (pinned.length === 0) {
+    pinnedListEl.innerHTML = '<li class="empty">ピン留めメモはありません。</li>';
+  } else {
+    pinned.forEach((n) => pinnedListEl.appendChild(buildNoteRow(n)));
+  }
+
+  allNotesListEl.innerHTML = '';
+  if (notes.length === 0) {
+    allNotesListEl.innerHTML = '<li class="empty">メモがありません。</li>';
+  } else {
+    notes.forEach((n) => allNotesListEl.appendChild(buildNoteRow(n)));
+  }
+}
+
+function buildHomeTodoRow(todo) {
+  const li = document.createElement('li');
+  li.className = `todo-item${todo.done ? ' done' : ''}`;
+  const priorityHtml = todo.priority === 'high' ? '<span class="priority">❗</span>' : '';
+  li.innerHTML = `<input type="checkbox" ${todo.done ? 'checked' : ''} />${priorityHtml}<span class="todo-text">${escapeHtml(todo.text)}</span>`;
+  li.querySelector('input').addEventListener('change', (e) => toggleTodo(todo, e.target.checked));
+  return li;
+}
+
+function buildNoteRow(note) {
+  const li = document.createElement('li');
+  li.className = 'note-row';
+  const cat = getCategory(note.category);
+  const dotHtml = cat ? `<span class="dot" style="background:${cat.color}"></span>` : '';
+  li.innerHTML = `${dotHtml}<span class="note-title">${escapeHtml(note.title)}</span>`;
+  li.addEventListener('click', () => openNote(note.path));
+  return li;
+}
+
+// ---- メモ閲覧（Markdownプレビューのみ。編集はしない） ----
+
+const TODO_LINK_PREFIX = 'todo:';
+
+function preprocessWikiLinks(markdown) {
+  return markdown.replace(/\[\[([^\]]+)\]\]/g, (match, name) => {
+    const trimmed = name.trim();
+    if (trimmed.toLowerCase().startsWith(TODO_LINK_PREFIX)) {
+      const q = trimmed.slice(TODO_LINK_PREFIX.length).trim();
+      const esc = escapeHtml(q || 'やりたいこと');
+      return `<a href="#" class="wiki-link" data-todo-query="${esc}">✅ ${esc}</a>`;
+    }
+    const esc = escapeHtml(trimmed);
+    return `<a href="#" class="wiki-link" data-note-title="${esc}">${esc}</a>`;
+  });
+}
+
+async function openNote(path) {
+  const note = notes.find((n) => n.path === path);
+  if (!note) return;
+  showView('note');
+  noteTitleLabelEl.textContent = note.title;
+  notePreviewEl.innerHTML = marked.parse(preprocessWikiLinks(note.body || ''));
+  await resolveImages(notePreviewEl);
+}
+
+function guessMimeType(path) {
+  const ext = (path.split('.').pop() || '').toLowerCase();
+  if (ext === 'png') return 'image/png';
+  if (ext === 'jpg' || ext === 'jpeg') return 'image/jpeg';
+  if (ext === 'gif') return 'image/gif';
+  if (ext === 'webp') return 'image/webp';
+  if (ext === 'svg') return 'image/svg+xml';
+  return 'application/octet-stream';
+}
+
+async function resolveImages(container) {
+  const imgs = container.querySelectorAll('img[src^="images/"]');
+  for (const img of imgs) {
+    const path = img.getAttribute('src');
+    const entry = treeByPath.get(path);
+    if (!entry) continue;
+    try {
+      const bytes = await fetchBlob(entry.sha);
+      const blob = new Blob([bytes], { type: guessMimeType(path) });
+      img.src = URL.createObjectURL(blob);
+    } catch (e) {
+      // 取得できない場合はそのまま（壊れた画像アイコン表示）
+    }
+  }
+}
+
+notePreviewEl.addEventListener('click', (e) => {
+  const link = e.target.closest('.wiki-link');
+  if (!link) return;
+  e.preventDefault();
+  if (link.dataset.todoQuery) {
+    showView('todos');
+    return;
+  }
+  const target = (link.dataset.noteTitle || '').trim().toLowerCase();
+  const match = notes.find((n) => n.title.trim().toLowerCase() === target);
+  if (match) {
+    openNote(match.path);
+  } else {
+    alert(`「${link.dataset.noteTitle}」というメモが見つかりません（スマホ版では新規作成はできません）。`);
+  }
+});
+
+// ---- やりたいこと（唯一の書き込み処理） ----
+
+function renderTodosView() {
+  todosViewListEl.innerHTML = '';
+  if (todos.length === 0) {
+    todosViewListEl.innerHTML = '<li class="empty">まだ何もありません。上のフォームから追加しましょう。</li>';
+    return;
+  }
+  todos.forEach((todo) => {
+    const li = document.createElement('li');
+    li.className = `todo-item${todo.done ? ' done' : ''}`;
+    const priorityHtml = todo.priority === 'high' ? '<span class="priority">❗</span>' : '';
+    li.innerHTML = `<input type="checkbox" ${todo.done ? 'checked' : ''} />${priorityHtml}<span class="todo-text">${escapeHtml(todo.text)}</span>`;
+    li.querySelector('input').addEventListener('change', (e) => toggleTodo(todo, e.target.checked));
+    todosViewListEl.appendChild(li);
+  });
+}
+
+async function toggleTodo(todo, checked) {
+  todo.done = checked;
+  todo.updated = new Date().toISOString();
+  renderTodosView();
+  renderHome();
+  await writeTodos();
+}
+
+todoAddForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const text = todoInputEl.value.trim();
+  if (!text) return;
+  const now = new Date().toISOString();
+  todos.unshift({
+    id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    text,
+    done: false,
+    created: now,
+    updated: now,
+    priority: 'normal',
+  });
+  todoInputEl.value = '';
+  renderTodosView();
+  renderHome();
+  await writeTodos();
+});
+
+// 両方にある項目はupdated（無ければcreated）が新しい方を採用。片方にしかない項目は残す（PC版と同じ方針）
+function mergeTodos(localList, remoteList) {
+  const localById = new Map(localList.map((t) => [t.id, t]));
+  const remoteById = new Map(remoteList.map((t) => [t.id, t]));
+  const mergedById = new Map();
+  localById.forEach((local, id) => {
+    const remote = remoteById.get(id);
+    if (!remote) {
+      mergedById.set(id, local);
+      return;
+    }
+    const lu = local.updated || local.created || '';
+    const ru = remote.updated || remote.created || '';
+    mergedById.set(id, ru > lu ? remote : local);
+  });
+  remoteById.forEach((remote, id) => {
+    if (!mergedById.has(id)) mergedById.set(id, remote);
+  });
+  const ordered = [];
+  localList.forEach((t) => {
+    if (mergedById.has(t.id)) {
+      ordered.push(mergedById.get(t.id));
+      mergedById.delete(t.id);
+    }
+  });
+  remoteList.forEach((t) => {
+    if (mergedById.has(t.id)) {
+      ordered.push(mergedById.get(t.id));
+      mergedById.delete(t.id);
+    }
+  });
+  return ordered;
+}
+
+// .todos.json への書き込み。sha不一致（409/422）の場合はリモートを取得してマージし、1回だけ再試行する
+async function writeTodos() {
+  setStatus('保存中...');
+  try {
+    const body = {
+      message: 'mobile: update .todos.json',
+      content: bytesToBase64(utf8ToBytes(JSON.stringify(todos, null, 2))),
+      branch: config.branch,
+    };
+    if (todosSha) body.sha = todosSha;
+
+    let res = await ghFetch(`/contents/${encodeApiPath(TODOS_FILE)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+
+    if ((res.status === 409 || res.status === 422) && todosSha) {
+      const latest = await fetchFileViaContents(TODOS_FILE);
+      if (latest) {
+        let remoteTodos = [];
+        try {
+          remoteTodos = JSON.parse(bytesToUtf8(latest.bytes));
+        } catch (e) {
+          remoteTodos = [];
+        }
+        todos = mergeTodos(todos, remoteTodos);
+        renderTodosView();
+        renderHome();
+        const retryBody = {
+          ...body,
+          sha: latest.sha,
+          content: bytesToBase64(utf8ToBytes(JSON.stringify(todos, null, 2))),
+        };
+        res = await ghFetch(`/contents/${encodeApiPath(TODOS_FILE)}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(retryBody),
+        });
+      }
+    }
+
+    if (!res.ok) {
+      const errText = await res.text().catch(() => '');
+      throw new Error(`保存に失敗しました（${res.status}）${errText ? `: ${errText}` : ''}`);
+    }
+    const data = await res.json();
+    todosSha = data.content.sha;
+    setStatus(null);
+  } catch (e) {
+    console.error(e);
+    setStatus(`保存に失敗しました。オフラインまたはトークンが失効している可能性があります。（${e.message || e}）`, true);
+  }
+}
+
+// ---- 画面切り替え ----
+
+function showView(view) {
+  viewHome.hidden = view !== 'home';
+  viewNote.hidden = view !== 'note';
+  viewTodos.hidden = view !== 'todos';
+  viewSettings.hidden = view !== 'settings';
+  navHomeBtn.classList.toggle('active', view === 'home');
+  navTodosBtn.classList.toggle('active', view === 'todos');
+  if (view === 'todos') renderTodosView();
+}
+
+navHomeBtn.addEventListener('click', () => showView('home'));
+navTodosBtn.addEventListener('click', () => showView('todos'));
+noteBackBtn.addEventListener('click', () => showView('home'));
+
+refreshBtn.addEventListener('click', () => loadAll());
+
+settingsBtn.addEventListener('click', () => {
+  settingsRepoInput.value = config ? `${config.owner}/${config.repo}` : '';
+  settingsBranchInput.value = (config && config.branch) || 'main';
+  settingsTokenInput.value = (config && config.token) || '';
+  showView('settings');
+});
+settingsCancelBtn.addEventListener('click', () => showView('home'));
+settingsForm.addEventListener('submit', (e) => {
+  e.preventDefault();
+  const repoValue = settingsRepoInput.value.trim();
+  const parts = repoValue.split('/').map((s) => s.trim());
+  if (!parts[0] || !parts[1]) return;
+  config = {
+    owner: parts[0],
+    repo: parts[1],
+    branch: settingsBranchInput.value.trim() || 'main',
+    token: settingsTokenInput.value.trim(),
+  };
+  saveConfig(config);
+  showView('home');
+  loadAll();
+});
+
+// ---- 初回設定 ----
+
+setupForm.addEventListener('submit', (e) => {
+  e.preventDefault();
+  const repoValue = setupRepoInput.value.trim();
+  const parts = repoValue.split('/').map((s) => s.trim());
+  const owner = parts[0];
+  const repo = parts[1];
+  if (!owner || !repo) {
+    setupError.textContent = '「owner/repo」の形式で入力してください（例: NorihitoYonemura/memo-data）';
+    return;
+  }
+  const branch = setupBranchInput.value.trim() || 'main';
+  const token = setupTokenInput.value.trim();
+  if (!token) {
+    setupError.textContent = 'Personal Access Token を入力してください。';
+    return;
+  }
+  config = { owner, repo, branch, token };
+  saveConfig(config);
+  enterApp();
+});
+
+// ---- 起動 ----
+
+async function enterApp() {
+  setupScreen.hidden = true;
+  appEl.hidden = false;
+  showView('home');
+  await loadAll();
+}
+
+config = loadConfig();
+if (config) {
+  enterApp();
+} else {
+  setupScreen.hidden = false;
+}
+</script>
+</body>
+</html>
