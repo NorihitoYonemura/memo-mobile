@@ -345,6 +345,30 @@
     color: var(--text-main);
     font-size: 13px;
   }
+  .cal-day-new-form {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+  }
+  .cal-day-new-form input {
+    flex: 1;
+    padding: 9px 10px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-main);
+    font-size: 13px;
+    outline: none;
+  }
+  .cal-day-new-form button {
+    padding: 9px 14px;
+    border-radius: 8px;
+    border: none;
+    background: var(--accent);
+    color: #fff;
+    font-size: 13px;
+    cursor: pointer;
+  }
 
   /* ---- デイリーノート ---- */
   #view-quick {
@@ -439,6 +463,85 @@
     cursor: pointer;
   }
   nav.tab-nav button.active { color: var(--accent); font-weight: 700; }
+
+  /* ---- メモ⇔やりたいことの紐づけ ---- */
+  .link-tabs {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 12px;
+  }
+  .link-tab {
+    flex: 1;
+    padding: 8px 10px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .link-tab.active {
+    color: #fff;
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+  .link-count-badge {
+    margin-left: auto;
+    flex-shrink: 0;
+    font-size: 11px;
+    color: var(--accent);
+    padding: 1px 7px;
+    border-radius: 999px;
+    background: rgba(124, 108, 240, 0.16);
+  }
+  .link-detail {
+    margin-top: 16px;
+    border-top: 1px solid var(--border);
+    padding-top: 12px;
+  }
+  .link-detail-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 8px;
+  }
+  .link-detail-title {
+    font-size: 14px;
+    font-weight: 700;
+    margin: 0;
+    word-break: break-word;
+  }
+  .link-detail-sub {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin: 10px 0 6px;
+  }
+  #link-detail-list li {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 4px;
+  }
+  #link-detail-list .note-title { flex: 1; }
+  #link-detail-list button {
+    flex-shrink: 0;
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    font-size: 16px;
+    line-height: 1;
+    cursor: pointer;
+  }
+  #link-detail-add-select {
+    width: 100%;
+    margin-top: 8px;
+    padding: 9px 10px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--bg-panel);
+    color: var(--text-main);
+    font-size: 13px;
+  }
 </style>
 </head>
 <body>
@@ -485,6 +588,7 @@
       <button id="nav-todos-btn" data-view="todos">✅ やりたいこと</button>
       <button id="nav-calendar-btn" data-view="calendar">🗓 予定</button>
       <button id="nav-quick-btn" data-view="quick">📅 デイリー</button>
+      <button id="nav-link-btn" data-view="link">🔗 紐づけ</button>
     </nav>
 
     <main id="view-home" class="view">
@@ -536,8 +640,12 @@
       <div id="cal-day-detail" class="cal-day-detail" hidden>
         <p id="cal-day-detail-label" class="cal-day-detail-label"></p>
         <ul id="cal-day-todo-list" class="plain-list"></ul>
+        <form id="cal-day-new-form" class="cal-day-new-form">
+          <input id="cal-day-new-input" type="text" placeholder="この日にやることを追加..." />
+          <button type="submit">追加</button>
+        </form>
         <select id="cal-day-add-select">
-          <option value="">＋ 未予定のやりたいことを追加...</option>
+          <option value="">＋ 既存のやりたいことを追加...</option>
         </select>
       </div>
     </main>
@@ -548,6 +656,26 @@
       <div class="quick-save-row">
         <span id="quick-save-status" class="quick-save-status"></span>
         <button type="button" id="quick-save-btn" class="primary-btn">保存</button>
+      </div>
+    </main>
+
+    <main id="view-link" class="view" hidden>
+      <div class="link-tabs">
+        <button type="button" id="link-tab-note-btn" class="link-tab active">メモ</button>
+        <button type="button" id="link-tab-todo-btn" class="link-tab">やりたいこと</button>
+      </div>
+      <ul id="link-notes-list" class="plain-list"></ul>
+      <ul id="link-todos-list" class="plain-list" hidden></ul>
+      <div id="link-detail" class="link-detail" hidden>
+        <div class="link-detail-header">
+          <p id="link-detail-title" class="link-detail-title"></p>
+          <button type="button" id="link-detail-close-btn" class="icon-btn">×</button>
+        </div>
+        <p class="link-detail-sub">紐づく<span id="link-detail-sub-label"></span></p>
+        <ul id="link-detail-list" class="plain-list"></ul>
+        <select id="link-detail-add-select">
+          <option value="">＋ 追加...</option>
+        </select>
       </div>
     </main>
 
@@ -582,14 +710,20 @@
 const CONFIG_KEY = 'memo-mobile-github-sync';
 const TODOS_FILE = '.todos.json';
 const CATEGORIES_FILE = '.categories.json';
+const LINKS_FILE = '.note-links.json';
 const BRIEFING_PATH = '_ai/BRIEFING.md';
 
 let config = null;
 let categories = [];
 let todos = [];
 let todosSha = null;
+let noteLinks = []; // [{ note: path, todoId }] メモ⇔やりたいことの紐づけ（PC版と共有）
+let noteLinksSha = null;
 let notes = [];
 let treeByPath = new Map();
+let linkActiveTab = 'note';
+let linkDetailKind = null;
+let linkDetailId = null;
 let dailyNoteSha = null;
 let dailyNotePath = null;
 let calendarViewDate = new Date();
@@ -657,6 +791,21 @@ const calDayDetailEl = document.getElementById('cal-day-detail');
 const calDayDetailLabelEl = document.getElementById('cal-day-detail-label');
 const calDayTodoListEl = document.getElementById('cal-day-todo-list');
 const calDayAddSelectEl = document.getElementById('cal-day-add-select');
+const calDayNewForm = document.getElementById('cal-day-new-form');
+const calDayNewInput = document.getElementById('cal-day-new-input');
+
+const navLinkBtn = document.getElementById('nav-link-btn');
+const viewLink = document.getElementById('view-link');
+const linkTabNoteBtn = document.getElementById('link-tab-note-btn');
+const linkTabTodoBtn = document.getElementById('link-tab-todo-btn');
+const linkNotesListEl = document.getElementById('link-notes-list');
+const linkTodosListEl = document.getElementById('link-todos-list');
+const linkDetailEl = document.getElementById('link-detail');
+const linkDetailTitleEl = document.getElementById('link-detail-title');
+const linkDetailCloseBtn = document.getElementById('link-detail-close-btn');
+const linkDetailSubLabelEl = document.getElementById('link-detail-sub-label');
+const linkDetailListEl = document.getElementById('link-detail-list');
+const linkDetailAddSelectEl = document.getElementById('link-detail-add-select');
 
 // ---- 設定の読み書き（localStorageのみ。トークンをコードに埋め込まない） ----
 
@@ -819,6 +968,21 @@ async function loadAll() {
       todosSha = viaContents ? viaContents.sha : entry.sha;
     }
 
+    noteLinks = [];
+    noteLinksSha = null;
+    if (treeByPath.has(LINKS_FILE)) {
+      const entry = treeByPath.get(LINKS_FILE);
+      const bytes = await fetchBlob(entry.sha);
+      try {
+        noteLinks = JSON.parse(bytesToUtf8(bytes));
+        if (!Array.isArray(noteLinks)) noteLinks = [];
+      } catch (e) {
+        noteLinks = [];
+      }
+      const viaContentsLinks = await fetchFileViaContents(LINKS_FILE);
+      noteLinksSha = viaContentsLinks ? viaContentsLinks.sha : entry.sha;
+    }
+
     let briefingText = null;
     if (treeByPath.has(BRIEFING_PATH)) {
       const bytes = await fetchBlob(treeByPath.get(BRIEFING_PATH).sha);
@@ -843,6 +1007,7 @@ async function loadAll() {
 
     setStatus(null);
     renderHome();
+    renderLinkView();
     if (briefingText && briefingText.trim()) {
       briefingCard.hidden = false;
       briefingBodyEl.innerHTML = marked.parse(briefingText);
@@ -1045,6 +1210,28 @@ calDayAddSelectEl.addEventListener('change', async () => {
   await writeTodos();
 });
 
+// カレンダーの日付から直接、その日に予定済みの新しいやりたいことを作る
+calDayNewForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const text = calDayNewInput.value.trim();
+  if (!text || !selectedDayKey) return;
+  const now = new Date().toISOString();
+  todos.unshift({
+    id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    text,
+    done: false,
+    created: now,
+    updated: now,
+    priority: 'normal',
+    scheduledDate: selectedDayKey,
+  });
+  calDayNewInput.value = '';
+  renderDayDetail();
+  renderCalendarView();
+  renderHome();
+  await writeTodos();
+});
+
 calPrevBtn.addEventListener('click', () => {
   calendarViewDate = new Date(calendarViewDate.getFullYear(), calendarViewDate.getMonth() - 1, 1);
   renderCalendarView();
@@ -1085,8 +1272,19 @@ function buildHomeTodoRow(todo) {
   const li = document.createElement('li');
   li.className = `todo-item${todo.done ? ' done' : ''}`;
   const priorityHtml = todo.priority === 'high' ? '<span class="priority">❗</span>' : '';
-  li.innerHTML = `<input type="checkbox" ${todo.done ? 'checked' : ''} />${priorityHtml}<span class="todo-text">${escapeHtml(todo.text)}</span>`;
-  li.querySelector('input').addEventListener('change', (e) => toggleTodo(todo, e.target.checked));
+  const linkCount = linkedNotePathsForTodo(todo.id).length;
+  const badgeHtml = linkCount ? `<span class="link-count-badge">🔗${linkCount}</span>` : '';
+  li.innerHTML = `<input type="checkbox" ${todo.done ? 'checked' : ''} />${priorityHtml}<span class="todo-text">${escapeHtml(todo.text)}</span>${badgeHtml}`;
+  li.querySelector('input').addEventListener('change', (e) => {
+    e.stopPropagation();
+    toggleTodo(todo, e.target.checked);
+  });
+  li.addEventListener('click', (e) => {
+    if (e.target.tagName === 'INPUT') return;
+    showView('link');
+    setLinkTab('todo');
+    openLinkDetail('todo', todo.id);
+  });
   return li;
 }
 
@@ -1101,18 +1299,12 @@ function buildNoteRow(note) {
 }
 
 // ---- メモ閲覧（Markdownプレビューのみ。編集はしない） ----
-
-const TODO_LINK_PREFIX = 'todo:';
+// メモ⇔やりたいことの紐づけは [[todo:...]] のようなテキスト記法ではなく、
+// 「🔗 紐づけ」タブの専用UIに一本化した（PC版と同じ .note-links.json を共有）
 
 function preprocessWikiLinks(markdown) {
   return markdown.replace(/\[\[([^\]]+)\]\]/g, (match, name) => {
-    const trimmed = name.trim();
-    if (trimmed.toLowerCase().startsWith(TODO_LINK_PREFIX)) {
-      const q = trimmed.slice(TODO_LINK_PREFIX.length).trim();
-      const esc = escapeHtml(q || 'やりたいこと');
-      return `<a href="#" class="wiki-link" data-todo-query="${esc}">✅ ${esc}</a>`;
-    }
-    const esc = escapeHtml(trimmed);
+    const esc = escapeHtml(name.trim());
     return `<a href="#" class="wiki-link" data-note-title="${esc}">${esc}</a>`;
   });
 }
@@ -1156,10 +1348,6 @@ notePreviewEl.addEventListener('click', (e) => {
   const link = e.target.closest('.wiki-link');
   if (!link) return;
   e.preventDefault();
-  if (link.dataset.todoQuery) {
-    showView('todos');
-    return;
-  }
   const target = (link.dataset.noteTitle || '').trim().toLowerCase();
   const match = notes.find((n) => n.title.trim().toLowerCase() === target);
   if (match) {
@@ -1303,6 +1491,215 @@ async function writeTodos() {
   }
 }
 
+// ---- メモ⇔やりたいことの紐づけ（.note-links.json。PC版と共有するデータ形式） ----
+// タップ操作向けのUIのため、PC版のようなドラッグではなく「メモ／やりたいこと」の一覧から
+// タップして詳細パネルを開き、<select>で相手を選んで紐づける方式にしている
+
+function linkedTodoIdsForNote(path) {
+  return noteLinks.filter((l) => l.note === path).map((l) => l.todoId);
+}
+
+function linkedNotePathsForTodo(todoId) {
+  return noteLinks.filter((l) => l.todoId === todoId).map((l) => l.note);
+}
+
+// .note-links.json への書き込み。sha不一致時はリモートを取得し直し、両方の変更を単純合体（重複除去）してから1回だけ再試行する
+async function writeNoteLinks() {
+  setStatus('保存中...');
+  try {
+    const body = {
+      message: 'mobile: update .note-links.json',
+      content: bytesToBase64(utf8ToBytes(JSON.stringify(noteLinks, null, 2))),
+      branch: config.branch,
+    };
+    if (noteLinksSha) body.sha = noteLinksSha;
+
+    let res = await ghFetch(`/contents/${encodeApiPath(LINKS_FILE)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+
+    if ((res.status === 409 || res.status === 422) && noteLinksSha) {
+      const latest = await fetchFileViaContents(LINKS_FILE);
+      if (latest) {
+        let remoteLinks = [];
+        try {
+          remoteLinks = JSON.parse(bytesToUtf8(latest.bytes));
+          if (!Array.isArray(remoteLinks)) remoteLinks = [];
+        } catch (e) {
+          remoteLinks = [];
+        }
+        const key = (l) => `${l.note}::${l.todoId}`;
+        const merged = new Map([...remoteLinks, ...noteLinks].map((l) => [key(l), l]));
+        noteLinks = [...merged.values()];
+        const retryBody = {
+          ...body,
+          sha: latest.sha,
+          content: bytesToBase64(utf8ToBytes(JSON.stringify(noteLinks, null, 2))),
+        };
+        res = await ghFetch(`/contents/${encodeApiPath(LINKS_FILE)}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(retryBody),
+        });
+      }
+    }
+
+    if (!res.ok) {
+      const errText = await res.text().catch(() => '');
+      throw new Error(`保存に失敗しました（${res.status}）${errText ? `: ${errText}` : ''}`);
+    }
+    const data = await res.json();
+    noteLinksSha = data.content.sha;
+    setStatus(null);
+  } catch (e) {
+    console.error(e);
+    setStatus(`保存に失敗しました。オフラインまたはトークンが失効している可能性があります。（${e.message || e}）`, true);
+  }
+}
+
+async function addNoteLinkMobile(path, todoId) {
+  if (noteLinks.some((l) => l.note === path && l.todoId === todoId)) return;
+  noteLinks.push({ note: path, todoId });
+  await writeNoteLinks();
+}
+
+async function removeNoteLinkMobile(path, todoId) {
+  const before = noteLinks.length;
+  noteLinks = noteLinks.filter((l) => !(l.note === path && l.todoId === todoId));
+  if (noteLinks.length !== before) await writeNoteLinks();
+}
+
+function buildLinkListRow(kind, id, label, linkCount) {
+  const li = document.createElement('li');
+  li.className = 'note-row';
+  const badgeHtml = linkCount ? `<span class="link-count-badge">${linkCount}</span>` : '';
+  li.innerHTML = `<span class="note-title">${escapeHtml(label)}</span>${badgeHtml}`;
+  li.addEventListener('click', () => openLinkDetail(kind, id));
+  return li;
+}
+
+function renderLinkView() {
+  linkNotesListEl.innerHTML = '';
+  linkTodosListEl.innerHTML = '';
+
+  if (notes.length === 0) {
+    linkNotesListEl.innerHTML = '<li class="empty">メモがありません。</li>';
+  } else {
+    notes.forEach((n) => linkNotesListEl.appendChild(buildLinkListRow('note', n.path, n.title, linkedTodoIdsForNote(n.path).length)));
+  }
+
+  if (todos.length === 0) {
+    linkTodosListEl.innerHTML = '<li class="empty">やりたいことがありません。</li>';
+  } else {
+    todos.forEach((t) => linkTodosListEl.appendChild(buildLinkListRow('todo', t.id, t.text, linkedNotePathsForTodo(t.id).length)));
+  }
+
+  // 詳細パネルを開いたまま一覧が更新された場合は内容も再描画する
+  if (linkDetailKind && !linkDetailEl.hidden) openLinkDetail(linkDetailKind, linkDetailId);
+}
+
+function setLinkTab(tab) {
+  linkActiveTab = tab;
+  linkTabNoteBtn.classList.toggle('active', tab === 'note');
+  linkTabTodoBtn.classList.toggle('active', tab === 'todo');
+  linkNotesListEl.hidden = tab !== 'note';
+  linkTodosListEl.hidden = tab !== 'todo';
+  closeLinkDetail();
+}
+
+function openLinkDetail(kind, id) {
+  linkDetailKind = kind;
+  linkDetailId = id;
+  linkDetailEl.hidden = false;
+  linkDetailListEl.innerHTML = '';
+  linkDetailAddSelectEl.innerHTML = '<option value="">＋ 追加...</option>';
+
+  if (kind === 'todo') {
+    const todo = todos.find((t) => t.id === id);
+    if (!todo) { closeLinkDetail(); return; }
+    linkDetailTitleEl.textContent = todo.text;
+    linkDetailSubLabelEl.textContent = 'メモ';
+    const linkedPaths = linkedNotePathsForTodo(id);
+    linkedPaths.map((p) => notes.find((n) => n.path === p)).filter(Boolean).forEach((note) => {
+      linkDetailListEl.appendChild(buildLinkDetailRow(note.title, () => openNote(note.path), async () => {
+        await removeNoteLinkMobile(note.path, id);
+        renderLinkView();
+      }));
+    });
+    if (linkedPaths.length === 0) {
+      linkDetailListEl.innerHTML = '<li class="empty">まだありません。</li>';
+    }
+    notes.filter((n) => !linkedPaths.includes(n.path)).forEach((n) => {
+      const opt = document.createElement('option');
+      opt.value = n.path;
+      opt.textContent = n.title;
+      linkDetailAddSelectEl.appendChild(opt);
+    });
+  } else {
+    const note = notes.find((n) => n.path === id);
+    if (!note) { closeLinkDetail(); return; }
+    linkDetailTitleEl.textContent = note.title;
+    linkDetailSubLabelEl.textContent = 'やりたいこと';
+    const linkedIds = linkedTodoIdsForNote(id);
+    linkedIds.map((tid) => todos.find((t) => t.id === tid)).filter(Boolean).forEach((todo) => {
+      linkDetailListEl.appendChild(buildLinkDetailRow(todo.text, null, async () => {
+        await removeNoteLinkMobile(id, todo.id);
+        renderLinkView();
+      }));
+    });
+    if (linkedIds.length === 0) {
+      linkDetailListEl.innerHTML = '<li class="empty">まだありません。</li>';
+    }
+    todos.filter((t) => !linkedIds.includes(t.id)).forEach((t) => {
+      const opt = document.createElement('option');
+      opt.value = t.id;
+      opt.textContent = t.text;
+      linkDetailAddSelectEl.appendChild(opt);
+    });
+  }
+}
+
+function buildLinkDetailRow(label, onOpen, onRemove) {
+  const li = document.createElement('li');
+  const titleSpan = document.createElement('span');
+  titleSpan.className = 'note-title';
+  titleSpan.textContent = label;
+  if (onOpen) {
+    titleSpan.style.cursor = 'pointer';
+    titleSpan.addEventListener('click', onOpen);
+  }
+  const removeBtn = document.createElement('button');
+  removeBtn.type = 'button';
+  removeBtn.className = 'icon-btn';
+  removeBtn.textContent = '×';
+  removeBtn.addEventListener('click', onRemove);
+  li.appendChild(titleSpan);
+  li.appendChild(removeBtn);
+  return li;
+}
+
+function closeLinkDetail() {
+  linkDetailKind = null;
+  linkDetailId = null;
+  linkDetailEl.hidden = true;
+}
+
+linkDetailCloseBtn.addEventListener('click', closeLinkDetail);
+linkTabNoteBtn.addEventListener('click', () => setLinkTab('note'));
+linkTabTodoBtn.addEventListener('click', () => setLinkTab('todo'));
+linkDetailAddSelectEl.addEventListener('change', async () => {
+  const value = linkDetailAddSelectEl.value;
+  if (!value || !linkDetailKind) return;
+  if (linkDetailKind === 'todo') {
+    await addNoteLinkMobile(value, linkDetailId);
+  } else {
+    await addNoteLinkMobile(linkDetailId, value);
+  }
+  renderLinkView();
+});
+
 // ---- デイリーノート（今日の日付の通常メモを開いて編集） ----
 // PC版と同じfrontmatter形式の.mdファイルとして保存する（例: 2026-07-11.md）。
 // スマホ限定の特別なデータではなく、他のメモと同じ扱いで一覧・検索・カテゴリー分けの対象になる。
@@ -1391,20 +1788,24 @@ function showView(view) {
   viewTodos.hidden = view !== 'todos';
   viewCalendar.hidden = view !== 'calendar';
   viewQuick.hidden = view !== 'quick';
+  viewLink.hidden = view !== 'link';
   viewSettings.hidden = view !== 'settings';
   navHomeBtn.classList.toggle('active', view === 'home');
   navTodosBtn.classList.toggle('active', view === 'todos');
   navCalendarBtn.classList.toggle('active', view === 'calendar');
   navQuickBtn.classList.toggle('active', view === 'quick');
+  navLinkBtn.classList.toggle('active', view === 'link');
   if (view === 'todos') renderTodosView();
   if (view === 'calendar') { renderCalendarView(); renderDayDetail(); }
   if (view === 'quick') renderQuickView();
+  if (view === 'link') renderLinkView();
 }
 
 navHomeBtn.addEventListener('click', () => showView('home'));
 navTodosBtn.addEventListener('click', () => showView('todos'));
 navCalendarBtn.addEventListener('click', () => showView('calendar'));
 navQuickBtn.addEventListener('click', () => showView('quick'));
+navLinkBtn.addEventListener('click', () => showView('link'));
 noteBackBtn.addEventListener('click', () => showView('home'));
 
 refreshBtn.addEventListener('click', () => loadAll());
