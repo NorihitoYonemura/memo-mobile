@@ -4,6 +4,15 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
 <title>MEMOTAS</title>
+<!-- 2026-07-12: manifest未リンク＋apple-touch-icon無しでiOSの「ホーム画面に追加」がmanifestのアイコンを使わず
+     自動生成の「M」アイコンになっていた不具合を修正。manifest.jsonの"any"アイコンと同じ画像を両方に指定する -->
+<link rel="manifest" href="manifest.json" />
+<link rel="icon" href="data:image/png;base64,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" />
+<link rel="apple-touch-icon" href="data:image/png;base64,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" />
+<meta name="theme-color" content="#7c6cf0" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="MEMOTAS" />
 <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -271,6 +280,14 @@
     font-size: 14px;
   }
   li.todo-item.done span.todo-text { color: var(--text-muted); text-decoration: line-through; }
+  /* 改善.mdフォローアップ（2026-07-12）: ホーム最上部の「今日の予定」プレビュー */
+  li.home-schedule-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    cursor: pointer;
+  }
   li.todo-item input[type="checkbox"] {
     width: 18px;
     height: 18px;
@@ -303,6 +320,27 @@
     list-style: none;
     margin: 0;
     padding: 0;
+  }
+  /* 改善.mdフォローアップ（2026-07-12）: ごはん記録に日付をつけて積み上がるように表示 */
+  .meals-today-label {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-weight: 600;
+    margin: 0 0 8px;
+  }
+  .meals-history {
+    margin-top: 16px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .meals-history-group .meals-history-date {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-weight: 600;
+    margin: 0 0 6px;
   }
   .meal-slot {
     display: flex;
@@ -851,6 +889,11 @@
         <input id="home-search-input" type="text" class="home-search-input" placeholder="メモを検索..." />
       </div>
 
+      <section id="home-schedule-card" class="card" hidden>
+        <h2>📅 今日の予定</h2>
+        <ul id="home-schedule-list" class="plain-list"></ul>
+      </section>
+
       <section class="card">
         <h2>やること</h2>
         <form id="todo-add-form">
@@ -928,7 +971,9 @@
 
     <main id="view-meal" class="view" hidden>
       <p class="today-label">🍚 ごはん</p>
+      <p id="meals-today-label" class="meals-today-label"></p>
       <ul id="meals-list" class="meals-list"></ul>
+      <div id="meals-history" class="meals-history"></div>
     </main>
 
     <main id="view-settings" class="view" hidden>
@@ -1017,12 +1062,16 @@ const viewSettings = document.getElementById('view-settings');
 const todayLabelEl = document.getElementById('today-label');
 const pullRefreshIndicatorEl = document.getElementById('pull-refresh-indicator');
 const homeSearchInputEl = document.getElementById('home-search-input');
+const homeScheduleCardEl = document.getElementById('home-schedule-card');
+const homeScheduleListEl = document.getElementById('home-schedule-list');
 const homeTodoListEl = document.getElementById('home-todo-list');
 const briefingCard = document.getElementById('briefing-card');
 const briefingBodyEl = document.getElementById('briefing-body');
 const pinnedListEl = document.getElementById('pinned-list');
 const allNotesListEl = document.getElementById('all-notes-list');
+const mealsTodayLabelEl = document.getElementById('meals-today-label');
 const mealsListEl = document.getElementById('meals-list');
+const mealsHistoryEl = document.getElementById('meals-history');
 
 const noteBackBtn = document.getElementById('note-back-btn');
 const noteTitleLabelEl = document.getElementById('note-title-label');
@@ -1123,9 +1172,14 @@ function encodeApiPath(path) {
 
 // ---- GitHub REST API ----
 
+// 2026-07-12バグ修正: 「編集してもリロードすると元に戻る」という報告の原因調査で、
+// GitHub APIのGETレスポンスがブラウザのHTTPキャッシュ（Cache-Control: private, max-age=60等）に
+// 乗ってしまい、直後にリロードすると編集前の内容がキャッシュから返ってきていたことが判明。
+// cache: 'no-store' を明示して常にネットワークから最新を取得するようにした
 async function ghFetch(path, options = {}) {
   const url = `https://api.github.com/repos/${config.owner}/${config.repo}${path}`;
   return fetch(url, {
+    cache: 'no-store',
     ...options,
     headers: {
       Authorization: `Bearer ${config.token}`,
@@ -1583,8 +1637,45 @@ calNextBtn.addEventListener('click', () => {
   renderCalendarView();
 });
 
+// 改善.mdフォローアップ（2026-07-12）: 「ホームに予定を最初持ってきたい」との要望に対応。
+// PC版はすでにホーム最上部にカレンダーがあるが、スマホ版のホームには予定のプレビューが無かったため、
+// 今日のやること（scheduledDateが今日）と今日の予定（events）をやることカードより上に一覧表示する
+function renderHomeSchedule() {
+  if (!homeScheduleCardEl || !homeScheduleListEl) return;
+  const todayStr = dateKey(new Date());
+  const todayDate = new Date();
+  const items = [];
+  todos.filter((t) => t.scheduledDate === todayStr && !t.done).forEach((t) => {
+    items.push({ time: t.time || '', text: t.text, kind: 'todo' });
+  });
+  events.filter((ev) => eventOccursOnDate(ev, todayDate, todayStr)).forEach((ev) => {
+    items.push({ time: ev.time || '', text: ev.text, kind: 'event' });
+  });
+  items.sort((a, b) => (a.time || '99:99').localeCompare(b.time || '99:99'));
+  homeScheduleListEl.innerHTML = '';
+  if (items.length === 0) {
+    homeScheduleCardEl.hidden = true;
+    return;
+  }
+  homeScheduleCardEl.hidden = false;
+  items.forEach((item) => {
+    const li = document.createElement('li');
+    li.className = 'home-schedule-item';
+    const timeHtml = item.time ? `<span class="event-time">${item.time}</span>` : '';
+    const iconHtml = item.kind === 'event' ? '📌' : '☑️';
+    li.innerHTML = `${timeHtml}<span class="todo-text">${iconHtml} ${escapeHtml(item.text)}</span>`;
+    li.addEventListener('click', () => {
+      selectedDayKey = todayStr;
+      showView('calendar');
+      calDayDetailEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    });
+    homeScheduleListEl.appendChild(li);
+  });
+}
+
 function renderHome() {
   todayLabelEl.textContent = formatToday(new Date());
+  renderHomeSchedule();
   renderMeals();
 
   homeTodoListEl.innerHTML = '';
@@ -2121,7 +2212,8 @@ function buildMealSlot(dateStr, slotKey, label) {
     const fileInput = document.createElement('input');
     fileInput.type = 'file';
     fileInput.accept = 'image/*';
-    fileInput.capture = 'environment';
+    // 2026-07-12: capture="environment" を指定するとOSによってはカメラ起動のみに固定され、
+    // 写真ライブラリからの選択ができなくなる不具合報告があったため外した（カメラ／ライブラリどちらもOSの標準ピッカーから選べる）
     fileInput.className = 'meal-file-input';
     fileInput.addEventListener('change', () => {
       const file = fileInput.files && fileInput.files[0];
@@ -2192,12 +2284,48 @@ function buildMealSlot(dateStr, slotKey, label) {
   return li;
 }
 
+// YYYY-MM-DD → "7/12（土）"のような短い日付ラベル（ごはん履歴用。2026-07-12追加。PC版app.jsと同じロジック）
+function formatMealDateShort(dateStr) {
+  const d = new Date(`${dateStr}T00:00:00`);
+  return `${d.getMonth() + 1}/${d.getDate()}（${WEEKDAYS_JA[d.getDay()]}）`;
+}
+
 function renderMeals() {
   if (!mealsListEl) return;
   const todayStr = dateKey(new Date());
   mealsListEl.innerHTML = '';
+  if (mealsTodayLabelEl) mealsTodayLabelEl.textContent = `今日 ${formatMealDateShort(todayStr)}`;
   MEAL_SLOTS.forEach(({ key, label }) => {
     mealsListEl.appendChild(buildMealSlot(todayStr, key, label));
+  });
+  renderMealsHistory(todayStr);
+}
+
+// 改善.mdフォローアップ（2026-07-12）: 「記録に日付をつけて、できる限り積み上がるように」との要望に対応。
+// PC版renderHomeMealsHistory()と同じロジック（今日以外で記録がある日付を新しい順に、記録済みの枠だけ表示）
+function renderMealsHistory(todayStr) {
+  if (!mealsHistoryEl) return;
+  mealsHistoryEl.innerHTML = '';
+  const dates = [...new Set(meals.map((m) => m.date))]
+    .filter((d) => d && d !== todayStr)
+    .sort((a, b) => (a < b ? 1 : -1));
+  if (dates.length === 0) return;
+  dates.forEach((dateStr) => {
+    const slotsForDate = MEAL_SLOTS.filter(({ key }) => findMealEntry(dateStr, key));
+    if (slotsForDate.length === 0) return;
+    const group = document.createElement('div');
+    group.className = 'meals-history-group';
+    const dateLabel = document.createElement('p');
+    dateLabel.className = 'meals-history-date';
+    dateLabel.textContent = formatMealDateShort(dateStr);
+    group.appendChild(dateLabel);
+    const list = document.createElement('ul');
+    list.className = 'meals-list';
+    slotsForDate.forEach(({ key, label }) => {
+      list.appendChild(buildMealSlot(dateStr, key, label));
+    });
+    group.appendChild(list);
+    mealsHistoryEl.appendChild(group);
   });
 }
 
