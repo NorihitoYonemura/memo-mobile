@@ -1277,9 +1277,12 @@ async function loadAll() {
       const entry = treeByPath.get(TODOS_FILE);
       const bytes = await fetchBlob(entry.sha);
       try {
-        todos = JSON.parse(bytesToUtf8(bytes));
+        const parsedTodos = splitTombstones(JSON.parse(bytesToUtf8(bytes)));
+        todos = parsedTodos.active;
+        todoTombstones = prunedTombstones(parsedTodos.tombstones);
       } catch (e) {
         todos = [];
+        todoTombstones = [];
       }
       // 書き込み時のsha競合チェック用に、Contents API側のsha（blob shaと同値）も取得しておく
       const viaContents = await fetchFileViaContents(TODOS_FILE);
@@ -1307,10 +1310,12 @@ async function loadAll() {
       const entry = treeByPath.get(MEALS_FILE);
       const bytes = await fetchBlob(entry.sha);
       try {
-        meals = JSON.parse(bytesToUtf8(bytes));
-        if (!Array.isArray(meals)) meals = [];
+        const parsedMeals = splitTombstones(JSON.parse(bytesToUtf8(bytes)));
+        meals = parsedMeals.active;
+        mealTombstones = prunedTombstones(parsedMeals.tombstones);
       } catch (e) {
         meals = [];
+        mealTombstones = [];
       }
       const viaContentsMeals = await fetchFileViaContents(MEALS_FILE);
       mealsSha = viaContentsMeals ? viaContentsMeals.sha : entry.sha;
@@ -1322,10 +1327,12 @@ async function loadAll() {
       const entry = treeByPath.get(EVENTS_FILE);
       const bytes = await fetchBlob(entry.sha);
       try {
-        events = JSON.parse(bytesToUtf8(bytes));
-        if (!Array.isArray(events)) events = [];
+        const parsedEvents = splitTombstones(JSON.parse(bytesToUtf8(bytes)));
+        events = parsedEvents.active;
+        eventTombstones = prunedTombstones(parsedEvents.tombstones);
       } catch (e) {
         events = [];
+        eventTombstones = [];
       }
       const viaContentsEvents = await fetchFileViaContents(EVENTS_FILE);
       eventsSha = viaContentsEvents ? viaContentsEvents.sha : entry.sha;
@@ -1800,6 +1807,7 @@ function startEditHomeTodoRow(li, todo) {
 // 削除（紐づけデータも一緒に掃除する。PC版のremoveNoteLinksForTodo相当）
 async function deleteTodoMobile(todo) {
   todos = todos.filter((t) => t.id !== todo.id);
+  todoTombstones.push(makeTombstone(todo.id)); // 削除を他デバイスにも伝播（墓標）
   const linkedBefore = noteLinks.length;
   noteLinks = noteLinks.filter((l) => l.todoId !== todo.id);
   renderHome();
@@ -1922,6 +1930,35 @@ todoAddForm.addEventListener('submit', async (e) => {
 });
 
 // 両方にある項目はupdated（無ければcreated）が新しい方を採用。片方にしかない項目は残す（PC版と同じ方針）
+// ---- 削除トゥームストーン（2026-07-12 同期強化。PC版app.jsと同じ仕組み） ----
+// id+updatedマージは「片方にしか無い項目は残す」ため、単純に配列から削除すると
+// もう一方のデバイスに残っている同じ項目が次の同期で復活してしまう（削除が伝播しない）。
+// 削除時は { id, deleted: true, updated } の墓標レコードを残して「削除の方が新しい」ことを伝える。
+// UI用の配列（todos等）には墓標を含めず、書き込み時に [...active, ...tombstones] で送る。墓標は30日で自動掃除。
+const TOMBSTONE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
+let todoTombstones = [];
+let mealTombstones = [];
+let eventTombstones = [];
+
+function splitTombstones(arr) {
+  const active = [];
+  const tombstones = [];
+  (Array.isArray(arr) ? arr : []).forEach((it) => {
+    if (it && it.deleted) tombstones.push(it);
+    else if (it) active.push(it);
+  });
+  return { active, tombstones };
+}
+
+function makeTombstone(id) {
+  return { id, deleted: true, updated: new Date().toISOString() };
+}
+
+function prunedTombstones(list) {
+  const cutoff = Date.now() - TOMBSTONE_MAX_AGE_MS;
+  return list.filter((t) => (Date.parse(t.updated || '') || 0) > cutoff);
+}
+
 function mergeTodos(localList, remoteList) {
   const localById = new Map(localList.map((t) => [t.id, t]));
   const remoteById = new Map(remoteList.map((t) => [t.id, t]));
@@ -1961,7 +1998,7 @@ async function writeTodos() {
   try {
     const body = {
       message: 'mobile: update .todos.json',
-      content: bytesToBase64(utf8ToBytes(JSON.stringify(todos, null, 2))),
+      content: bytesToBase64(utf8ToBytes(JSON.stringify([...todos, ...prunedTombstones(todoTombstones)], null, 2))),
       branch: config.branch,
     };
     if (todosSha) body.sha = todosSha;
@@ -1981,12 +2018,14 @@ async function writeTodos() {
         } catch (e) {
           remoteTodos = [];
         }
-        todos = mergeTodos(todos, remoteTodos);
+        const mergedTodos = splitTombstones(mergeTodos([...todos, ...todoTombstones], remoteTodos));
+        todos = mergedTodos.active;
+        todoTombstones = prunedTombstones(mergedTodos.tombstones);
         renderHome();
         const retryBody = {
           ...body,
           sha: latest.sha,
-          content: bytesToBase64(utf8ToBytes(JSON.stringify(todos, null, 2))),
+          content: bytesToBase64(utf8ToBytes(JSON.stringify([...todos, ...prunedTombstones(todoTombstones)], null, 2))),
         };
         res = await ghFetch(`/contents/${encodeApiPath(TODOS_FILE)}`, {
           method: 'PUT',
@@ -2044,7 +2083,7 @@ async function writeMeals() {
   try {
     const body = {
       message: 'mobile: update .meals.json',
-      content: bytesToBase64(utf8ToBytes(JSON.stringify(meals, null, 2))),
+      content: bytesToBase64(utf8ToBytes(JSON.stringify([...meals, ...prunedTombstones(mealTombstones)], null, 2))),
       branch: config.branch,
     };
     if (mealsSha) body.sha = mealsSha;
@@ -2064,12 +2103,14 @@ async function writeMeals() {
         } catch (e) {
           remoteMeals = [];
         }
-        meals = mergeMeals(meals, remoteMeals);
+        const mergedMeals = splitTombstones(mergeMeals([...meals, ...mealTombstones], remoteMeals));
+        meals = mergedMeals.active;
+        mealTombstones = prunedTombstones(mergedMeals.tombstones);
         renderHome();
         const retryBody = {
           ...body,
           sha: latest.sha,
-          content: bytesToBase64(utf8ToBytes(JSON.stringify(meals, null, 2))),
+          content: bytesToBase64(utf8ToBytes(JSON.stringify([...meals, ...prunedTombstones(mealTombstones)], null, 2))),
         };
         res = await ghFetch(`/contents/${encodeApiPath(MEALS_FILE)}`, {
           method: 'PUT',
@@ -2179,6 +2220,7 @@ function buildMealSlot(dateStr, slotKey, label) {
     delBtn.addEventListener('click', async () => {
       if (!confirm(`「${label}」の記録を削除しますか？`)) return;
       meals = meals.filter((m) => m.id !== entry.id);
+      mealTombstones.push(makeTombstone(entry.id)); // 削除を他デバイスにも伝播（墓標）
       entry = null;
       renderView();
       await writeMeals();
@@ -2371,7 +2413,7 @@ async function writeEvents() {
   try {
     const body = {
       message: 'mobile: update .events.json',
-      content: bytesToBase64(utf8ToBytes(JSON.stringify(events, null, 2))),
+      content: bytesToBase64(utf8ToBytes(JSON.stringify([...events, ...prunedTombstones(eventTombstones)], null, 2))),
       branch: config.branch,
     };
     if (eventsSha) body.sha = eventsSha;
@@ -2391,13 +2433,15 @@ async function writeEvents() {
         } catch (e) {
           remoteEvents = [];
         }
-        events = mergeEvents(events, remoteEvents);
+        const mergedEvents = splitTombstones(mergeEvents([...events, ...eventTombstones], remoteEvents));
+        events = mergedEvents.active;
+        eventTombstones = prunedTombstones(mergedEvents.tombstones);
         renderCalendarView();
         renderDayDetail();
         const retryBody = {
           ...body,
           sha: latest.sha,
-          content: bytesToBase64(utf8ToBytes(JSON.stringify(events, null, 2))),
+          content: bytesToBase64(utf8ToBytes(JSON.stringify([...events, ...prunedTombstones(eventTombstones)], null, 2))),
         };
         res = await ghFetch(`/contents/${encodeApiPath(EVENTS_FILE)}`, {
           method: 'PUT',
@@ -2437,6 +2481,7 @@ function buildEventItem(event) {
         : `「${event.text}」を削除しますか？`;
       if (!confirm(msg)) return;
       events = events.filter((ev) => ev.id !== event.id);
+      eventTombstones.push(makeTombstone(event.id)); // 削除を他デバイスにも伝播（墓標）
       renderDayDetail();
       renderCalendarView();
       await writeEvents();
